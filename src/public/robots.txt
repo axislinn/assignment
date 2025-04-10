@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://secondchance-marketplace.vercel.app/sitemap.xml
