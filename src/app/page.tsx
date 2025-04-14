@@ -1,4 +1,4 @@
-import { ProductFeed } from "@/components/product/product-feed"
+import { ProductFeed } from "@/components/products/product-feed"
 import { HeroSection } from "@/components/hero-section"
 import { CategorySection } from "@/components/category-section"
 

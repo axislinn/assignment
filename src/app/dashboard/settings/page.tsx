@@ -237,7 +237,7 @@ export default function DashboardSettingsPage() {
                           <FormControl>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onChange={field.onChange}
                             />
                           </FormControl>
                         </FormItem>
@@ -257,7 +257,7 @@ export default function DashboardSettingsPage() {
                           <FormControl>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onChange={field.onChange}
                             />
                           </FormControl>
                         </FormItem>
@@ -277,7 +277,7 @@ export default function DashboardSettingsPage() {
                           <FormControl>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onChange={field.onChange}
                             />
                           </FormControl>
                         </FormItem>
@@ -297,7 +297,7 @@ export default function DashboardSettingsPage() {
                           <FormControl>
                             <Switch
                               checked={field.value}
-                              onCheckedChange={field.onChange}
+                              onChange={field.onChange}
                             />
                           </FormControl>
                         </FormItem>

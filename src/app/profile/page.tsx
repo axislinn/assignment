@@ -195,9 +195,7 @@ export default function ProfilePage() {
                             <FormLabel>Account Type</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select account type" />
-                                </SelectTrigger>
+                                <SelectTrigger placeholder="Select account type" />
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="buyer">Buyer</SelectItem>
