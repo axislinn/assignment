@@ -103,7 +103,7 @@ export default function SettingsPage() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                     </FormItem>
@@ -124,7 +124,7 @@ export default function SettingsPage() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                     </FormItem>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                     </FormItem>
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                     </FormItem>

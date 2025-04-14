@@ -42,12 +42,22 @@ interface ChatParticipant {
   photoURL: string | null
 }
 
+interface ChatData {
+  id: string
+  participants: string[]
+  productId?: string
+  productTitle?: string
+  productImage?: string
+  lastMessage?: string
+  lastMessageTime?: any
+}
+
 export default function ChatPage() {
   const { id } = useParams()
   const { user } = useAuth()
   const { toast } = useToast()
 
-  const [chat, setChat] = useState<any | null>(null)
+  const [chat, setChat] = useState<ChatData | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [otherUser, setOtherUser] = useState<ChatParticipant | null>(null)
   const [messageText, setMessageText] = useState("")
@@ -64,7 +74,10 @@ export default function ChatPage() {
         const chatDoc = await getDoc(doc(db, "chats", id as string))
 
         if (chatDoc.exists()) {
-          const chatData = { id: chatDoc.id, ...chatDoc.data() }
+          const chatData = { 
+            id: chatDoc.id, 
+            ...chatDoc.data() 
+          } as ChatData
           setChat(chatData)
 
           // Get the other participant's info
@@ -241,7 +254,7 @@ export default function ChatPage() {
               <div className="relative h-10 w-10 overflow-hidden rounded">
                 <Image
                   src={chat.productImage || "/placeholder.svg?height=40&width=40"}
-                  alt={chat.productTitle}
+                  alt={chat.productTitle || "Product image"}
                   fill
                   className="object-cover"
                 />

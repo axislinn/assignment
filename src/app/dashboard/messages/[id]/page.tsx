@@ -66,7 +66,7 @@ export default function DashboardMessageDetailPage() {
         const chatDoc = await getDoc(doc(db, "chats", id as string))
         
         if (chatDoc.exists()) {
-          const chatData = { id: chatDoc.id, ...chatDoc.data() }
+          const chatData = { id: chatDoc.id, ...(chatDoc.data() as { participants: string[] }) }
           setChat(chatData)
           
           // Get the other participant's info

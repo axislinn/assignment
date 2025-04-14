@@ -23,7 +23,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
+
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -33,21 +33,35 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { MoreHorizontal, Search, Truck } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Define the Order type
+interface Order {
+  id: string;
+  productTitle: string;
+  productPrice: number;
+  status: string;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
+  buyerId: string;
+  sellerId: string;
+}
 
 export default function DashboardOrdersPage() {
   const { user, userRole } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [newStatus, setNewStatus] = useState<string>("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   
   useEffect(() => {
     if (!user) {
@@ -85,7 +99,7 @@ export default function DashboardOrdersPage() {
         const ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        }))
+        })) as Order[]
         
         setOrders(ordersData)
       } catch (error) {
@@ -124,6 +138,7 @@ export default function DashboardOrdersPage() {
       })
       
       setSelectedOrder(null)
+      setIsDialogOpen(false)
     } catch (error) {
       console.error("Error updating order status:", error)
       toast({
@@ -132,6 +147,17 @@ export default function DashboardOrdersPage() {
         variant: "destructive",
       })
     }
+  }
+  
+  const openStatusDialog = (order: Order) => {
+    setSelectedOrder(order)
+    setNewStatus(order.status)
+    setIsDialogOpen(true)
+  }
+  
+  // Add a function to handle status changes
+  const handleStatusSelect = (status: string) => {
+    setNewStatus(status)
   }
   
   const filteredOrders = orders.filter((order) =>
@@ -146,7 +172,7 @@ export default function DashboardOrdersPage() {
       case "shipped":
         return "default"
       case "delivered":
-        return "success"
+        return "secondary"
       case "cancelled":
         return "destructive"
       default:
@@ -238,50 +264,10 @@ export default function DashboardOrdersPage() {
                             <DropdownMenuItem asChild>
                               <a href={`/dashboard/orders/${order.id}`}>View Details</a>
                             </DropdownMenuItem>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => {
-                                  e.preventDefault()
-                                  setSelectedOrder(order)
-                                  setNewStatus(order.status)
-                                }}>
-                                  <Truck className="mr-2 h-4 w-4" />
-                                  Update Status
-                                </DropdownMenuItem>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Update Order Status</DialogTitle>
-                                  <DialogDescription>
-                                    Change the status for order {selectedOrder?.id?.substring(0, 8)}...
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4">
-                                  <Select
-                                    value={newStatus}
-                                    onValueChange={setNewStatus}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="paid">Paid</SelectItem>
-                                      <SelectItem value="shipped">Shipped</SelectItem>
-                                      <SelectItem value="delivered">Delivered</SelectItem>
-                                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <DialogFooter>
-                                  <Button
-                                    onClick={() => handleStatusChange(selectedOrder?.id, newStatus)}
-                                    disabled={!selectedOrder || selectedOrder.status === newStatus}
-                                  >
-                                    Save Changes
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
+                            <DropdownMenuItem onSelect={() => openStatusDialog(order)}>
+                              <Truck className="mr-2 h-4 w-4" />
+                              Update Status
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -293,6 +279,39 @@ export default function DashboardOrdersPage() {
           </div>
         )}
       </DashboardShell.Content>
+      
+      {/* Status Update Dialog - Moved outside the loop */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Update Order Status</DialogTitle>
+      <DialogDescription>
+        Change the status for order {selectedOrder?.id?.substring(0, 8)}...
+      </DialogDescription>
+    </DialogHeader>
+    <div className="py-4">
+      <Select value={newStatus} onValueChange={handleStatusSelect}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select a status" /> {/* Placeholder is used here */}
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="paid">Paid</SelectItem>
+          <SelectItem value="shipped">Shipped</SelectItem>
+          <SelectItem value="delivered">Delivered</SelectItem>
+          <SelectItem value="cancelled">Cancelled</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <DialogFooter>
+      <Button
+        onClick={() => handleStatusChange(selectedOrder?.id || "", newStatus)}
+        disabled={!selectedOrder || selectedOrder.status === newStatus}
+      >
+        Save Changes
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </DashboardShell>
   )
 }

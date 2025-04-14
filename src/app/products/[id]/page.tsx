@@ -31,6 +31,27 @@ import { StarRating } from "@/components/star-rating"
 import { Heart, MessageSquare, Share2, User } from 'lucide-react'
 import type { Product, Review } from "@/lib/types"
 
+interface ChatData {
+  id: string
+  participants: string[]
+  productId: string
+  productTitle: string
+  productImage: string
+  createdAt: any
+  lastMessage: string | null
+  lastMessageTime: any | null
+}
+
+type FirestoreData = {
+  participants: string[]
+  productId: string
+  productTitle: string
+  productImage: string
+  createdAt: any
+  lastMessage: string | null
+  lastMessageTime: any | null
+}
+
 export default function ProductDetailPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -165,28 +186,32 @@ export default function ProductDetailPage() {
       const chatsQuery = query(collection(db, "chats"), where("participants", "array-contains", user.uid))
       const chatsSnapshot = await getDocs(chatsQuery)
 
-      let existingChat = null
-      chatsSnapshot.forEach((doc) => {
-        const chatData = doc.data()
-        if (chatData.participants.includes(product.sellerId)) {
-          existingChat = { id: doc.id, ...chatData }
+      let existingChat: ChatData | null = null
+      for (const doc of chatsSnapshot.docs) {
+        const data = doc.data() as FirestoreData
+        if (data.participants.includes(product.sellerId)) {
+          existingChat = {
+            id: doc.id,
+            ...data
+          } as ChatData
+          break
         }
-      })
+      }
 
       if (existingChat) {
         router.push(`/messages/${existingChat.id}`)
       } else {
         // Create new chat
-        const chatRef = await addDoc(collection(db, "chats"), {
+        const chatData: Omit<ChatData, 'id'> = {
           participants: [user.uid, product.sellerId],
-          productId: id,
+          productId: product.id,
           productTitle: product.title,
           productImage: product.imageUrl,
           createdAt: serverTimestamp(),
           lastMessage: null,
           lastMessageTime: null,
-        })
-
+        }
+        const chatRef = await addDoc(collection(db, "chats"), chatData)
         router.push(`/messages/${chatRef.id}`)
       }
     } catch (error) {
@@ -436,7 +461,7 @@ export default function ProductDetailPage() {
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={review.userPhotoURL} alt={review.userName} />
+                            <AvatarImage src={review.userPhotoURL || ""} alt={review.userName || "User"} />
                             <AvatarFallback>{review.userName?.[0] || "U"}</AvatarFallback>
                           </Avatar>
                           <div>

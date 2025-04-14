@@ -1,4 +1,4 @@
-import { ProductFeed } from "@/components/product/product-feed"
+import { ProductFeed } from "@/components/products/product-feed"
 
 export default function ProductsPage() {
   return (

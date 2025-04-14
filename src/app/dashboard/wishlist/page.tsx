@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth/use-auth"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
-import { ProductCard } from "@/components/product/product-card"
+import { ProductCard } from "@/components/products/product-card"
 import type { Product } from "@/lib/types"
 
 export default function DashboardWishlistPage() {
