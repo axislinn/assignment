@@ -88,59 +88,37 @@ export default function SellPage() {
     }
   }
 
-  // const uploadImageToSupabase = async (file: File) => {
-  //   const fileExt = file.name.split(".").pop()
-  //   const fileName = `${uuidv4()}.${fileExt}`
-  //   const filePath = `product-images/${fileName}`
+  const uploadImageToSupabase = async (file: File): Promise<string> => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${uuidv4()}.${fileExt}`
+      const filePath = `product-images/${fileName}`
 
-  //   const { data, error } = await supabase.storage.from("marketplace").upload(filePath, file)
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('marketplace')
+        .upload(filePath, file)
 
-  //   if (error) {
-  //     throw new Error("Error uploading image: " + error.message)
-  //   }
+      if (uploadError) {
+        throw new Error('Error uploading image: ' + uploadError.message)
+      }
 
-  //   // Get public URL
-  //   const {
-  //     data: { publicUrl },
-  //   } = supabase.storage.from("marketplace").getPublicUrl(filePath)
+      // getPublicUrl has no error, only data
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('marketplace')
+        .getPublicUrl(filePath)
 
-  //   return publicUrl
-  // }
+      if (!publicUrlData?.publicUrl) {
+        throw new Error('Failed to retrieve public URL.')
+      }
 
-
-
- const uploadImageToSupabase = async (file: File): Promise<string> => {
-  try {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${uuidv4()}.${fileExt}`
-    const filePath = `product-images/${fileName}`
-
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from('marketplace')
-      .upload(filePath, file)
-
-    if (uploadError) {
-      throw new Error('Error uploading image: ' + uploadError.message)
+      return publicUrlData.publicUrl
+    } catch (error: any) {
+      console.error('Upload failed:', error.message || error)
+      throw error
     }
-
-    // getPublicUrl has no error, only data
-    const { data: publicUrlData } = supabase
-      .storage
-      .from('marketplace')
-      .getPublicUrl(filePath)
-
-    if (!publicUrlData?.publicUrl) {
-      throw new Error('Failed to retrieve public URL.')
-    }
-
-    return publicUrlData.publicUrl
-  } catch (error: any) {
-    console.error('Upload failed:', error.message || error)
-    throw error
   }
-}
-
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -162,20 +140,14 @@ export default function SellPage() {
       return
     }
 
-    if (!selectedImage) {
-      toast({
-        title: "Image required",
-        description: "Please upload at least one image of your product",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsLoading(true)
 
     try {
-      // Upload image to Supabase
-      const imageUrl = await uploadImageToSupabase(selectedImage)
+      // Upload image to Supabase if selected
+      let imageUrl = null
+      if (selectedImage) {
+        imageUrl = await uploadImageToSupabase(selectedImage)
+      }
 
       // Add product to Firestore
       const productData = {

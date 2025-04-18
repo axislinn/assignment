@@ -42,32 +42,64 @@ import { Edit, MoreHorizontal, Plus, Search, Trash } from 'lucide-react'
 import type { Product } from "@/lib/types"
 
 export default function DashboardProductsPage() {
+  console.log("Component rendering")
+  
   const { user, userRole } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  
+  console.log("Initial values:", {
+    hasUser: !!user,
+    userRole,
+    isClient: typeof window !== 'undefined'
+  })
   
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   
   useEffect(() => {
-    if (!user) {
-      router.push("/login")
+    console.log("Effect triggered with:", {
+      userExists: !!user,
+      userRole,
+      userId: user?.uid
+    })
+
+    if (!user || !userRole) {
+      console.log("Missing user or role, waiting...")
       return
     }
     
     const fetchProducts = async () => {
+      console.log("Starting to fetch products with:", {
+        userRole,
+        userId: user.uid
+      })
+      
       try {
-        let productsQuery
+        // First try a simple query without conditions to verify collection access
+        const simpleQuery = query(collection(db, "products"))
+        const snapshot = await getDocs(simpleQuery)
         
+        console.log("Initial query check:", {
+          totalDocuments: snapshot.size,
+          empty: snapshot.empty,
+          firstDoc: snapshot.empty ? null : {
+            id: snapshot.docs[0].id,
+            data: snapshot.docs[0].data()
+          }
+        })
+
+        // Now apply the role-based query
+        let productsQuery
         if (userRole === "admin") {
-          // Admins can see all products
+          console.log("Using admin query")
           productsQuery = query(
             collection(db, "products"),
             orderBy("createdAt", "desc")
           )
         } else {
-          // Sellers can only see their own products
+          console.log("Using seller query for ID:", user.uid)
           productsQuery = query(
             collection(db, "products"),
             where("sellerId", "==", user.uid),
@@ -76,14 +108,35 @@ export default function DashboardProductsPage() {
         }
         
         const productsSnapshot = await getDocs(productsQuery)
+        console.log("Role-based query results:", {
+          empty: productsSnapshot.empty,
+          size: productsSnapshot.size,
+          documents: productsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            sellerId: doc.data().sellerId,
+            title: doc.data().title
+          }))
+        })
+
+        if (productsSnapshot.empty) {
+          console.log("No products found for current user")
+          setProducts([])
+          return
+        }
+
         const productsData = productsSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Product[]
         
+        console.log("Final products data:", productsData)
         setProducts(productsData)
       } catch (error) {
-        console.error("Error fetching products:", error)
+        console.error("Error details:", {
+          error,
+          message: error instanceof Error ? error.message : "Unknown error",
+          code: error instanceof Error ? (error as any).code : undefined
+        })
         toast({
           title: "Error",
           description: "Failed to load products",

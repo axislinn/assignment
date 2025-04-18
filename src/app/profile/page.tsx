@@ -39,35 +39,56 @@ export default function ProfilePage() {
     defaultValues: {
       displayName: "",
       email: "",
-      role: "buyer" as const,
+      role: "buyer",
       location: "",
       bio: "",
     },
   })
 
+  const role = form.watch("role")
+  console.log("Current form role value:", role)
+
   useEffect(() => {
     if (!user) {
+      console.log("No user found, redirecting to login")
       router.push("/login")
       return
     }
 
+    console.log("User found:", user.uid)
     const fetchUserData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, "users", user.uid))
+        console.log("Starting to fetch user data...")
+        const userDocRef = doc(db, "users", user.uid)
+        console.log("User document reference:", userDocRef.path)
+        
+        const userDoc = await getDoc(userDocRef)
+        console.log("Firestore document exists:", userDoc.exists())
+        
         if (userDoc.exists()) {
           const data = userDoc.data()
+          console.log("Firestore data:", data)
+          console.log("User role from Firestore:", data.role)
+          
           setUserData(data)
 
-          form.reset({
+          const formData = {
             displayName: user.displayName || "",
             email: user.email || "",
-            role: (data.role as "buyer" | "seller") || "buyer",
+            role: data.role || "buyer",
             location: data.location || "",
             bio: data.bio || "",
-          })
+          }
+          console.log("Setting form data:", formData)
+          
+          form.reset(formData)
+          
+          console.log("Form values after reset:", form.getValues())
+        } else {
+          console.error("User document not found in Firestore")
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
+        console.error("Error in fetchUserData:", error)
         toast({
           title: "Error",
           description: "Failed to load your profile data",
@@ -78,6 +99,13 @@ export default function ProfilePage() {
 
     fetchUserData()
   }, [user, router, toast, form])
+
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+      console.log("Form field changed:", { name, type, value })
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
 
   async function onSubmit(values: z.infer<typeof profileFormSchema>) {
     if (!user) return
@@ -193,9 +221,11 @@ export default function ProfilePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Account Type</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
-                                <SelectTrigger placeholder="Select account type" />
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select account type" />
+                                </SelectTrigger>
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="buyer">Buyer</SelectItem>

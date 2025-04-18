@@ -41,19 +41,32 @@ export default function MyListingsPage() {
         )
 
         const listingsSnapshot = await getDocs(listingsQuery)
+        
+        // If query returns empty, it's a new user - no error needed
+        if (listingsSnapshot.empty) {
+          setListings([])
+          return
+        }
+
         const listingsData = listingsSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Product[]
 
         setListings(listingsData)
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching listings:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load your listings",
-          variant: "destructive",
-        })
+        
+        // Show error toast for Firebase-specific errors (like missing index)
+        // or other technical errors, but not for empty results
+        if (error?.name === "FirebaseError" && !error.message?.includes("no documents in result")) {
+          toast({
+            title: "Error",
+            description: "Failed to load your listings. Please try again later.",
+            variant: "destructive",
+          })
+        }
+        setListings([])
       } finally {
         setLoading(false)
       }
