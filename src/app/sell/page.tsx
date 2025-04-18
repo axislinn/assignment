@@ -142,73 +142,67 @@ export default function SellPage() {
 }
 
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please login to list a product",
-        variant: "destructive",
-      })
-      router.push("/login")
-      return
-    }
-
-    if (userRole !== "seller" && userRole !== "admin") {
-      toast({
-        title: "Permission denied",
-        description: "You need a seller account to list products",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!selectedImage) {
-      toast({
-        title: "Image required",
-        description: "Please upload at least one image of your product",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      // Upload image to Supabase
-      const imageUrl = await uploadImageToSupabase(selectedImage)
-
-      // Add product to Firestore
-      const productData = {
-        ...values,
-        sellerId: user.uid,
-        sellerName: user.displayName,
-        imageUrl,
-        status: userRole === "admin" ? "approved" : "pending", // Auto-approve for admins
-        createdAt: serverTimestamp(),
-      }
-
-      const docRef = await addDoc(collection(db, "products"), productData)
-
-      toast({
-        title: "Product listed successfully",
-        description:
-          userRole === "admin"
-            ? "Your product is now live on the marketplace"
-            : "Your product has been submitted for review",
-      })
-
-      router.push("/my-listings")
-    } catch (error: any) {
-      console.error("Error listing product:", error)
-      toast({
-        title: "Error listing product",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  if (!user) {
+    toast({
+      title: "Authentication required",
+      description: "Please login to list a product",
+      variant: "destructive",
+    })
+    router.push("/login")
+    return
   }
+
+  if (userRole !== "seller" && userRole !== "admin") {
+    toast({
+      title: "Permission denied",
+      description: "You need a seller account to list products",
+      variant: "destructive",
+    })
+    return
+  }
+
+  setIsLoading(true)
+
+  try {
+    // Upload image to Supabase if selected
+    let imageUrl = null
+    if (selectedImage) {
+      imageUrl = await uploadImageToSupabase(selectedImage)
+    }
+
+    // Add product to Firestore
+    const productData = {
+      ...values,
+      sellerId: user.uid,
+      sellerName: user.displayName,
+      imageUrl,
+      status: userRole === "admin" ? "approved" : "pending", // Auto-approve for admins
+      createdAt: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(collection(db, "products"), productData)
+
+    toast({
+      title: "Product listed successfully",
+      description:
+        userRole === "admin"
+          ? "Your product is now live on the marketplace"
+          : "Your product has been submitted for review",
+    })
+
+    router.push("/my-listings")
+  } catch (error: any) {
+    console.error("Error listing product:", error)
+    toast({
+      title: "Error listing product",
+      description: error.message,
+      variant: "destructive",
+    })
+  } finally {
+    setIsLoading(false)
+  }
+}
 
   if (!user) {
     return (

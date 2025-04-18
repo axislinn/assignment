@@ -82,6 +82,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       setUserRole(role)
+      
+      // Store user data in cookie for server-side access
+      const userData = {
+        uid: user.uid,
+        email: user.email,
+        displayName,
+        role
+      }
+      
+      // Set cookie with user data
+      document.cookie = `user-session=${encodeURIComponent(JSON.stringify(userData))}; path=/; max-age=${60*60*24*7}`
 
       toast({
         title: "Account created successfully",
@@ -99,7 +110,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+      
+      // Get user data from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid))
+      let userRole = null
+      
+      if (userDoc.exists()) {
+        userRole = userDoc.data().role as UserRole
+        setUserRole(userRole)
+      }
+      
+      // Store user data in cookie for server-side access
+      const userData = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: userRole
+      }
+      
+      // Set cookie with user data
+      document.cookie = `user-session=${encodeURIComponent(JSON.stringify(userData))}; path=/; max-age=${60*60*24*7}`
+      
       toast({
         title: "Logged in successfully",
         description: "Welcome back to SecondChance Marketplace!",
@@ -117,6 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth)
+      
+      // Clear the user session cookie
+      document.cookie = "user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      
       toast({
         title: "Logged out successfully",
       })

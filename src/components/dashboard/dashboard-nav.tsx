@@ -65,11 +65,17 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
       roles: ["admin"],
     },
     {
+      title: "My Account",
+      href: "/dashboard/account",
+      icon: Users, // You can use another icon like User if available
+      roles: ["admin", "seller", "buyer"],
+    },
+    {
       title: "Settings",
       href: "/dashboard/settings",
       icon: Settings,
       roles: ["admin", "seller", "buyer"],
-    },
+    }
   ]
 
   // Filter items based on user role

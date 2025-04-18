@@ -9,12 +9,15 @@ interface DashboardLayoutProps {
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
+  // Get the current user. If the user is not logged in (has not created an account), user will be null.
   const user = await getCurrentUser()
 
+  // If the user is not logged in (no account), redirect to login page.
   if (!user) {
     redirect("/login")
   }
 
+  // If the user is logged in (has an account), show the dashboard panel.
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader />
