@@ -1,20 +1,126 @@
-import type { Metadata } from "next"
+"use client"
+
+import { useState, useEffect, Suspense } from "react"
+import dynamic from "next/dynamic"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { RecentSales } from "@/components/dashboard/recent-sales"
-import { Overview } from "@/components/dashboard/overview"
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Activity, CreditCard, DollarSign, Package, Users } from 'lucide-react'
+import { NotificationsTab } from "@/components/dashboard/notifications-tab"
+import { Badge } from "@/components/ui/badge"
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
+import { useAuth, AuthProvider } from "@/lib/auth-context"
+import { DateRange } from "react-day-picker"
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Example dashboard app built using the components.",
-}
+// Dynamically import components with SSR disabled
+const Overview = dynamic(() => import("@/components/dashboard/overview"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center w-full h-[350px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>
+  )
+})
 
-export default function DashboardPage() {
+const RecentSales = dynamic(() => import("@/components/dashboard/recent-sales"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center w-full h-[350px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>
+  )
+})
+
+function DashboardContent() {
+  const { user } = useAuth()
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
+  const [selectedTab, setSelectedTab] = useState("overview")
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: new Date(),
+    to: new Date(),
+  })
+  const [monthlySalesCount, setMonthlySalesCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!user) return
+
+    const fetchPendingOrdersCount = async () => {
+      try {
+        const ordersQuery = query(
+          collection(db, "orders"),
+          where("sellerId", "==", user.uid),
+          where("status", "==", "pending")
+        )
+        const snapshot = await getDocs(ordersQuery)
+        setPendingOrdersCount(snapshot.size)
+      } catch (error) {
+        console.error("Error fetching pending orders count:", error)
+      }
+    }
+
+    fetchPendingOrdersCount()
+  }, [user])
+
+  useEffect(() => {
+    const fetchMonthlySales = async () => {
+      if (!user) return
+
+      try {
+        // Get the start of the current month
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        
+        // First try without the date filter to check if we have any confirmed orders
+        const salesQuery = query(
+          collection(db, "orders"),
+          where("sellerId", "==", user.uid),
+          where("status", "in", ["confirmed", "Confirmed", "CONFIRMED", "paid", "Paid", "PAID", "delivered", "Delivered", "DELIVERED"])
+        )
+        
+        try {
+          const snapshot = await getDocs(salesQuery)
+          console.log("Total confirmed orders found:", snapshot.size)
+          
+          // Now try with the date filter
+          const monthlyQuery = query(
+            collection(db, "orders"),
+            where("sellerId", "==", user.uid),
+            where("status", "in", ["confirmed", "Confirmed", "CONFIRMED", "paid", "Paid", "PAID", "delivered", "Delivered", "DELIVERED"]),
+            where("createdAt", ">=", Timestamp.fromDate(startOfMonth))
+          )
+          
+          const monthlySnapshot = await getDocs(monthlyQuery)
+          console.log("Monthly orders found:", monthlySnapshot.size)
+          setMonthlySalesCount(monthlySnapshot.size)
+          
+        } catch (queryError: any) {
+          if (queryError?.message?.includes("requires an index")) {
+            console.error("Index required for orders query:", queryError)
+            // Try a simpler query without date filtering
+            const simpleQuery = query(
+              collection(db, "orders"),
+              where("sellerId", "==", user.uid),
+              where("status", "in", ["confirmed", "Confirmed", "CONFIRMED"])
+            )
+            const simpleSnapshot = await getDocs(simpleQuery)
+            setMonthlySalesCount(simpleSnapshot.size)
+          } else {
+            throw queryError
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching monthly sales:", error)
+        setMonthlySalesCount(0)
+      }
+    }
+
+    fetchMonthlySales()
+  }, [user])
+
   return (
     <DashboardShell>
       <DashboardShell.Header>
@@ -23,17 +129,27 @@ export default function DashboardPage() {
           Welcome back! Here's an overview of your marketplace activity.
         </DashboardShell.Description>
         <div className="flex items-center space-x-2">
-          <CalendarDateRangePicker />
+          <CalendarDateRangePicker date={date} setDate={setDate} />
           <Button>Download</Button>
         </div>
       </DashboardShell.Header>
       <DashboardShell.Content>
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="notifications" className="relative">
+              Notifications
+              {pendingOrdersCount > 0 && selectedTab !== "notifications" && (
+                <Badge 
+                  variant="destructive" 
+                  className="ml-2 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+                >
+                  {pendingOrdersCount}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -84,22 +200,49 @@ export default function DashboardPage() {
                   <CardTitle>Overview</CardTitle>
                 </CardHeader>
                 <CardContent className="pl-2">
-                  <Overview />
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center w-full h-[350px]">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    </div>
+                  }>
+                    <Overview />
+                  </Suspense>
                 </CardContent>
               </Card>
               <Card className="col-span-3">
                 <CardHeader>
                   <CardTitle>Recent Sales</CardTitle>
-                  <CardDescription>You made 265 sales this month.</CardDescription>
+                  <CardDescription>
+                    {monthlySalesCount !== null 
+                      ? `You made ${monthlySalesCount} sales this month.`
+                      : 'Loading sales data...'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RecentSales />
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center w-full h-[350px]">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    </div>
+                  }>
+                    <RecentSales />
+                  </Suspense>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
+          <TabsContent value="notifications">
+            <NotificationsTab />
+          </TabsContent>
         </Tabs>
       </DashboardShell.Content>
     </DashboardShell>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthProvider>
+      <DashboardContent />
+    </AuthProvider>
   )
 }

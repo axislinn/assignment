@@ -2,6 +2,9 @@
 
 import { Bar, BarChart as RechartsBarChart, Line, LineChart as RechartsLineChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, Legend } from "recharts"
 
+/**
+ * Demo data for charts. Real seller data should be passed via props from the dashboard.
+ */
 const barData = [
   { name: "Electronics", value: 4000 },
   { name: "Furniture", value: 3000 },
@@ -37,10 +40,13 @@ const pieData = [
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"]
 
-export function BarChart() {
+interface BarChartProps {
+  data?: any[]
+}
+export function BarChart({ data }: BarChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RechartsBarChart data={barData}>
+      <RechartsBarChart data={data && data.length > 0 ? data : barData}>
         <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
         <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
         <Tooltip
@@ -53,10 +59,13 @@ export function BarChart() {
   )
 }
 
-export function LineChart() {
+interface LineChartProps {
+  data?: any[]
+}
+export function LineChart({ data }: LineChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RechartsLineChart data={lineData}>
+      <RechartsLineChart data={data && data.length > 0 ? data : lineData}>
         <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
         <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
         <Tooltip

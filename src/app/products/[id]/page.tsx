@@ -19,7 +19,7 @@ import {
   orderBy,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -289,6 +289,27 @@ export default function ProductDetailPage() {
     }
   }
 
+  const handleAddToCart = () => {
+    if (!product) return
+    
+    // Create cart item data
+    const cartItem = {
+      productId: product.id,
+      title: product.title,
+      price: product.price,
+      image: product.imageUrl || "",
+      quantity: 1,
+      maxQuantity: product.inStockQuantity,
+      sellerId: product.sellerId
+    }
+
+    // Store in sessionStorage temporarily
+    sessionStorage.setItem('cartItem', JSON.stringify(cartItem))
+    
+    // Redirect to cart page
+    router.push('/cart')
+  }
+
   if (loading) {
     return (
       <div className="container py-12">
@@ -374,11 +395,16 @@ export default function ProductDetailPage() {
               <p className="mt-1">{product.sellerName}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Listed on</h3>
-              <p className="mt-1">
-                {product.createdAt ? new Date(product.createdAt.seconds * 1000).toLocaleDateString() : "Recently"}
-              </p>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">In Stock</h3>
+              <p className="mt-1">{product.inStockQuantity} available</p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Listed on</h3>
+            <p className="mt-1">
+              {product.createdAt ? new Date(product.createdAt.seconds * 1000).toLocaleDateString() : "Recently"}
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -393,6 +419,13 @@ export default function ProductDetailPage() {
             <Button className="flex-1" variant="outline">
               <Share2 className="mr-2 h-4 w-4" />
               Share
+            </Button>
+            <Button 
+              className="flex-1" 
+              onClick={handleAddToCart}
+              disabled={product.inStockQuantity <= 0}
+            >
+              Add to Cart
             </Button>
           </div>
 

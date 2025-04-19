@@ -11,6 +11,7 @@ export interface Product {
   sellerName: string
   status: "pending" | "approved" | "rejected"
   createdAt: any
+  inStockQuantity: number
 }
 
 export interface Review {

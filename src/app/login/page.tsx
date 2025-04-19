@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -18,7 +18,7 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { signIn } = useAuth()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -33,7 +33,7 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      await login(values.email, values.password)
+      await signIn(values.email, values.password)
       router.push("/")
     } catch (error) {
       console.error("Login error:", error)

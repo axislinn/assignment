@@ -25,13 +25,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Search, Menu, Heart, MessageSquare, ShoppingCart, User, LogOut, Settings, Package, LayoutDashboard } from 'lucide-react'
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState("")
   const pathname = usePathname()
-  const { user, logout, userRole } = useAuth()
+  const { user, signOut, userRole } = useAuth()
 
   const isActive = (path: string) => pathname === path
 
@@ -74,14 +74,14 @@ export default function Header() {
           <NavigationMenu className="hidden md:flex">
             <NavigationMenuList>
               <NavigationMenuItem>
-                <Link href="/products" legacyBehavior passHref>
-                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>Products</NavigationMenuLink>
-                </Link>
+                <NavigationMenuLink asChild>
+                  <Link href="/products" className={navigationMenuTriggerStyle()}>Products</Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <Link href="/sell" legacyBehavior passHref>
-                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>Sell</NavigationMenuLink>
-                </Link>
+                <NavigationMenuLink asChild>
+                  <Link href="/sell" className={navigationMenuTriggerStyle()}>Sell</Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
                 <NavigationMenuTrigger>Categories</NavigationMenuTrigger>
@@ -98,11 +98,11 @@ export default function Header() {
                       { title: "Home & Kitchen", href: "/products?category=home" },
                     ].map((category) => (
                       <li key={category.title}>
-                        <Link href={category.href} legacyBehavior passHref>
-                          <NavigationMenuLink className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                        <NavigationMenuLink asChild className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
+                          <Link href={category.href}>
                             <div className="text-sm font-medium leading-none">{category.title}</div>
-                          </NavigationMenuLink>
-                        </Link>
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                     ))}
                   </ul>
@@ -125,26 +125,26 @@ export default function Header() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
-            <Link href="/wishlist">
+          <Link href="/wishlist" className="hidden md:flex">
+            <Button variant="ghost" size="icon" className="hidden md:flex">
               <Heart className="h-5 w-5" />
               <span className="sr-only">Wishlist</span>
-            </Link>
-          </Button>
+            </Button>
+          </Link>
 
-          <Button variant="ghost" size="icon" asChild className="hidden md:flex">
-            <Link href="/messages">
+          <Link href="/messages" className="hidden md:flex">
+            <Button variant="ghost" size="icon" className="hidden md:flex">
               <MessageSquare className="h-5 w-5" />
               <span className="sr-only">Messages</span>
-            </Link>
-          </Button>
+            </Button>
+          </Link>
 
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/cart">
+          <Link href="/cart">
+            <Button variant="ghost" size="icon">
               <ShoppingCart className="h-5 w-5" />
               <span className="sr-only">Cart</span>
-            </Link>
-          </Button>
+            </Button>
+          </Link>
 
           {user ? (
             <DropdownMenu>
@@ -191,7 +191,7 @@ export default function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>

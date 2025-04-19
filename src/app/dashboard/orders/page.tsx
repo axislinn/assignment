@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { collection, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,6 +49,7 @@ interface Order {
   };
   buyerId: string;
   sellerId: string;
+  price?: number;
 }
 
 export default function DashboardOrdersPage() {
@@ -239,7 +240,7 @@ export default function DashboardOrdersPage() {
                       {order.id.substring(0, 8)}...
                     </TableCell>
                     <TableCell>{order.productTitle}</TableCell>
-                    <TableCell>${order.productPrice?.toFixed(2) || "N/A"}</TableCell>
+                    <TableCell>${(order.productPrice || order.price)?.toFixed(2) || "N/A"}</TableCell>
                     <TableCell>
                       {order.createdAt
                         ? new Date(order.createdAt.seconds * 1000).toLocaleDateString()

@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { supabase } from "@/lib/supabase"
@@ -27,6 +27,7 @@ const formSchema = z.object({
   category: z.string().min(1, { message: "Please select a category" }),
   condition: z.string().min(1, { message: "Please select a condition" }),
   location: z.string().min(1, { message: "Please select a location" }),
+  inStockQuantity: z.coerce.number().int().positive({ message: "Quantity must be a positive integer" }),
 })
 
 const categories = [
@@ -77,6 +78,7 @@ export default function SellPage() {
       category: "",
       condition: "",
       location: "",
+      inStockQuantity: 1,
     },
   })
 
@@ -255,6 +257,21 @@ export default function SellPage() {
                         <Input type="number" step="0.01" placeholder="e.g. 299.99" {...field} />
                       </FormControl>
                       <FormDescription>Set a competitive price for your item</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="inStockQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>In Stock Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" placeholder="e.g. 10" {...field} />
+                      </FormControl>
+                      <FormDescription>Number of items available for sale</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

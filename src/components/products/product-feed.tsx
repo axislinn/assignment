@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { ProductCard } from "./product-card"
 import { ProductFilters } from "./product-filters"
 import type { Product } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth, AuthProvider } from "@/lib/auth-context"
 
-export function ProductFeed() {
+function ProductFeedContent() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [wishlist, setWishlist] = useState<string[]>([])
@@ -121,5 +121,13 @@ export function ProductFeed() {
         </div>
       )}
     </div>
+  )
+}
+
+export function ProductFeed() {
+  return (
+    <AuthProvider>
+      <ProductFeedContent />
+    </AuthProvider>
   )
 }

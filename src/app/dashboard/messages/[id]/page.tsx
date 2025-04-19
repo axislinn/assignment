@@ -17,7 +17,7 @@ import {
   where,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

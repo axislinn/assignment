@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useAuth } from "@/lib/auth/use-auth"
+import { useAuth } from "@/lib/auth-context"
 import { LayoutDashboard, Package, ShoppingBag, Users, Settings, BarChart, MessageSquare, Heart, CreditCard } from 'lucide-react'
 
 interface DashboardNavProps extends React.HTMLAttributes<HTMLDivElement> {}
@@ -65,11 +65,17 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
       roles: ["admin"],
     },
     {
+      title: "My Account",
+      href: "/dashboard/account",
+      icon: Users, // You can use another icon like User if available
+      roles: ["admin", "seller", "buyer"],
+    },
+    {
       title: "Settings",
       href: "/dashboard/settings",
       icon: Settings,
       roles: ["admin", "seller", "buyer"],
-    },
+    }
   ]
 
   // Filter items based on user role

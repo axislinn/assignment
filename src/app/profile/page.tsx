@@ -7,8 +7,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { updateProfile } from "firebase/auth"
-import { db, auth } from "@/lib/firebase"
-import { useAuth } from "@/lib/auth/use-auth"
+import { db, auth } from "@/lib/firebase/config"
+import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User } from 'lucide-react'
+import { AuthProvider } from "@/lib/auth-context"
 
 const profileFormSchema = z.object({
   displayName: z.string().min(2, { message: "Display name must be at least 2 characters" }),
@@ -27,68 +28,58 @@ const profileFormSchema = z.object({
   bio: z.string().max(500, { message: "Bio must be less than 500 characters" }).optional(),
 })
 
-export default function ProfilePage() {
-  const { user, userRole } = useAuth()
+function ProfileContent() {
+  const { user, userRole, loading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [userData, setUserData] = useState<any>(null)
+
+  console.log("Auth state:", { user, loading, userRole }) // Debug log
 
   const form = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       displayName: "",
       email: "",
-      role: "buyer",
+      role: "buyer" as const,
       location: "",
       bio: "",
     },
   })
 
-  const role = form.watch("role")
-  console.log("Current form role value:", role)
-
   useEffect(() => {
-    if (!user) {
-      console.log("No user found, redirecting to login")
-      router.push("/login")
+    if (loading) {
+      console.log("Auth is still loading...") // Debug log
       return
     }
 
-    console.log("User found:", user.uid)
+    if (!user) {
+      console.log("No user found, redirecting to login...") // Debug log
+      router.push("/auth/login?redirect=/profile")
+      return
+    }
+
+    console.log("User found, fetching data...") // Debug log
+
     const fetchUserData = async () => {
       try {
-        console.log("Starting to fetch user data...")
-        const userDocRef = doc(db, "users", user.uid)
-        console.log("User document reference:", userDocRef.path)
-        
-        const userDoc = await getDoc(userDocRef)
-        console.log("Firestore document exists:", userDoc.exists())
-        
+        const userDoc = await getDoc(doc(db, "users", user.uid))
         if (userDoc.exists()) {
           const data = userDoc.data()
-          console.log("Firestore data:", data)
-          console.log("User role from Firestore:", data.role)
-          
           setUserData(data)
+          console.log("User data fetched:", data) // Debug log
 
-          const formData = {
+          form.reset({
             displayName: user.displayName || "",
             email: user.email || "",
-            role: data.role || "buyer",
+            role: (data.role as "buyer" | "seller") || "buyer",
             location: data.location || "",
             bio: data.bio || "",
-          }
-          console.log("Setting form data:", formData)
-          
-          form.reset(formData)
-          
-          console.log("Form values after reset:", form.getValues())
-        } else {
-          console.error("User document not found in Firestore")
+          })
         }
       } catch (error) {
-        console.error("Error in fetchUserData:", error)
+        console.error("Error fetching user data:", error)
         toast({
           title: "Error",
           description: "Failed to load your profile data",
@@ -98,14 +89,21 @@ export default function ProfilePage() {
     }
 
     fetchUserData()
-  }, [user, router, toast, form])
+  }, [user, loading, router, toast, form])
 
-  useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-      console.log("Form field changed:", { name, type, value })
-    })
-    return () => subscription.unsubscribe()
-  }, [form])
+  if (loading) {
+    return (
+      <div className="container py-12">
+        <div className="max-w-4xl mx-auto flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   async function onSubmit(values: z.infer<typeof profileFormSchema>) {
     if (!user) return
@@ -141,10 +139,6 @@ export default function ProfilePage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (!user) {
-    return null // Redirecting in useEffect
   }
 
   return (
@@ -221,7 +215,7 @@ export default function ProfilePage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Account Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select account type" />
@@ -313,5 +307,13 @@ export default function ProfilePage() {
         </Tabs>
       </div>
     </div>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <AuthProvider>
+      <ProfileContent />
+    </AuthProvider>
   )
 }

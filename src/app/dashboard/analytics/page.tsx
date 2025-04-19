@@ -6,12 +6,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarDateRangePicker } from "@/components/dashboard/date-range-picker"
 import { Button } from "@/components/ui/button"
-import { Overview } from "@/components/dashboard/overview"
-import { BarChart, LineChart, PieChart } from "@/components/dashboard/charts"
 import { Download } from 'lucide-react'
+import { DateRange } from "react-day-picker"
+import { BarChart, LineChart, PieChart } from "@/components/dashboard/charts"
+import dynamic from "next/dynamic"
+
+const Overview = dynamic(() => import("@/components/dashboard/overview"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[350px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>
+  ),
+})
 
 export default function AnalyticsPage() {
   const [selectedChart, setSelectedChart] = useState("sales")
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: new Date(2023, 0, 20),
+    to: new Date(),
+  })
+
+  // Define types for chart data
+  type ChartDataItem = { name: string; value: number }
+
+  const sellerBarData: ChartDataItem[] = [] // TODO: fetch seller's bar chart data
+  const sellerLineData: ChartDataItem[] = [] // TODO: fetch seller's line chart data
+  const sellerPieData: ChartDataItem[] = [] // TODO: fetch seller's pie chart data
 
   return (
     <DashboardShell>
@@ -21,7 +42,7 @@ export default function AnalyticsPage() {
           View detailed analytics and insights about your marketplace activity.
         </DashboardShell.Description>
         <div className="flex items-center space-x-2">
-          <CalendarDateRangePicker />
+          <CalendarDateRangePicker date={date} setDate={setDate} />
           <Button variant="outline" size="sm">
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -110,9 +131,9 @@ export default function AnalyticsPage() {
                     <TabsTrigger value="conversion">Conversion</TabsTrigger>
                   </TabsList>
                   <div className="h-[400px]">
-                    {selectedChart === "sales" && <BarChart />}
-                    {selectedChart === "views" && <LineChart />}
-                    {selectedChart === "conversion" && <LineChart />}
+                    {selectedChart === "sales" && <BarChart data={sellerBarData} />}
+                    {selectedChart === "views" && <LineChart data={sellerLineData} />}
+                    {selectedChart === "conversion" && <LineChart data={sellerLineData} />}
                   </div>
                 </Tabs>
               </CardContent>

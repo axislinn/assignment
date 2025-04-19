@@ -1,18 +1,36 @@
+"use client"
+
 import type { ReactNode } from "react"
-import { redirect } from "next/navigation"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { getCurrentUser } from "@/lib/auth/auth-utils"
+import { useAuth, AuthProvider } from "@/lib/auth-context"
 
 interface DashboardLayoutProps {
   children: ReactNode
 }
 
-export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  const user = await getCurrentUser()
+function DashboardLayoutContent({ children }: DashboardLayoutProps) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/login?redirect=/dashboard")
+    }
+  }, [user, loading, router])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
 
   if (!user) {
-    redirect("/login")
+    return null // Will redirect in useEffect
   }
 
   return (
@@ -25,5 +43,13 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <main className="flex w-full flex-col overflow-hidden py-6">{children}</main>
       </div>
     </div>
+  )
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  return (
+    <AuthProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </AuthProvider>
   )
 }
