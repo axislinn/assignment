@@ -92,9 +92,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password)
-    } catch (error) {
-      console.error("Error signing in:", error)
+      console.log("Attempting to sign in with email:", email)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+      console.log("Successfully authenticated user:", user.uid)
+
+      // Fetch user role from Firestore
+      console.log("Fetching user role from Firestore...")
+      const userDoc = await getDoc(doc(db, "users", user.uid))
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        console.log("User role found:", userData.role)
+        setUserRole(userData.role as UserRole)
+      } else {
+        console.log("No user document found in Firestore, defaulting to buyer")
+        setUserRole("buyer")
+      }
+    } catch (error: any) {
+      console.error("Detailed sign-in error:", {
+        code: error.code,
+        message: error.message,
+        email: email,
+        timestamp: new Date().toISOString()
+      })
       throw error
     }
   }

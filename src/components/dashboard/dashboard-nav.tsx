@@ -52,12 +52,7 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
       icon: Heart,
       roles: ["buyer"],
     },
-    {
-      title: "Payments",
-      href: "/dashboard/payments",
-      icon: CreditCard,
-      roles: ["admin", "seller"],
-    },
+    
     {
       title: "Users",
       href: "/dashboard/users",

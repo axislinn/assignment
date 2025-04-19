@@ -28,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { StarRating } from "@/components/star-rating"
-import { Heart, MessageSquare, Share2, User } from 'lucide-react'
+import { Heart, MessageSquare, ShoppingCart, User } from 'lucide-react'
 import type { Product, Review } from "@/lib/types"
 
 interface ChatData {
@@ -416,15 +416,12 @@ export default function ProductDetailPage() {
               <Heart className={`mr-2 h-4 w-4 ${inWishlist ? "fill-red-500 text-red-500" : ""}`} />
               {inWishlist ? "Saved" : "Save"}
             </Button>
-            <Button className="flex-1" variant="outline">
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
-            </Button>
             <Button 
               className="flex-1" 
               onClick={handleAddToCart}
               disabled={product.inStockQuantity <= 0}
             >
+              <ShoppingCart className="mr-2 h-4 w-4" />
               Add to Cart
             </Button>
           </div>
