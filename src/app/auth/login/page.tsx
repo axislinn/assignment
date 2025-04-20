@@ -86,12 +86,12 @@ function LoginContent() {
         <CardFooter className="flex flex-col space-y-4">
           <div className="text-center text-sm">
             Don't have an account?{" "}
-            <Link href="/auth/register" className="text-primary hover:underline">
+            <Link href="/register" className="text-primary hover:underline">
               Register
             </Link>
           </div>
           <div className="text-center text-sm">
-            <Link href="/auth/forgot-password" className="text-primary hover:underline">
+            <Link href="/login" className="text-primary hover:underline">
               Forgot your password?
             </Link>
           </div>

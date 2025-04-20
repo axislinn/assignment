@@ -9,8 +9,11 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   updateProfile,
+  updatePassword as updateUserPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from "firebase/auth"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase/config"
@@ -28,6 +31,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserProfile: (displayName: string, photoURL?: string) => Promise<void>
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -119,7 +123,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: email,
         timestamp: new Date().toISOString()
       })
-      throw error
+      
+      // Provide more user-friendly error messages
+      if (error.code === 'auth/invalid-credential') {
+        throw new Error("Invalid email or password. Please check your credentials and try again.")
+      } else if (error.code === 'auth/user-disabled') {
+        throw new Error("This account has been disabled. Please contact support.")
+      } else if (error.code === 'auth/user-not-found') {
+        throw new Error("No account found with this email. Please check your email or register.")
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error("Too many failed login attempts. Please try again later.")
+      } else {
+        throw new Error(error.message || "An error occurred during sign in. Please try again.")
+      }
     }
   }
 
@@ -196,6 +212,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!auth.currentUser || !auth.currentUser.email) {
+      throw new Error("No user is currently signed in")
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        currentPassword
+      )
+      await reauthenticateWithCredential(auth.currentUser, credential)
+      await updateUserPassword(auth.currentUser, newPassword)
+    } catch (error: any) {
+      console.error("Error updating password:", error)
+      if (error.code === "auth/wrong-password") {
+        throw new Error("Current password is incorrect")
+      }
+      throw new Error(error.message || "Failed to update password")
+    }
+  }
+
   const value = {
     user,
     userRole,
@@ -206,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     resetPassword,
     updateUserProfile,
+    updatePassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

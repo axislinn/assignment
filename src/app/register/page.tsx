@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z
   .object({
@@ -27,8 +28,9 @@ const formSchema = z
   })
 
 export default function RegisterPage() {
-  const { register } = useAuth()
+  const { signUp } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -45,10 +47,19 @@ export default function RegisterPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      await register(values.email, values.password, values.name, values.role)
+      await signUp(values.email, values.password, values.role, values.name)
+      toast({
+        title: "Account created successfully",
+        description: "Welcome to the marketplace!",
+      })
       router.push("/")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error)
+      toast({
+        title: "Registration failed",
+        description: error.message || "Failed to create account",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
