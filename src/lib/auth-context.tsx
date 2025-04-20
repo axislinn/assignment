@@ -14,6 +14,7 @@ import {
 } from "firebase/auth"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase/config"
+import { setupPresence } from "@/lib/firebase/presence"
 
 type UserRole = "buyer" | "seller" | "admin"
 
@@ -41,6 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user)
 
       if (user) {
+        // Set up presence tracking
+        setupPresence(user.uid)
+        
         // Fetch user role from Firestore
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid))

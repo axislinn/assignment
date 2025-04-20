@@ -105,8 +105,7 @@ export default function DashboardMessageDetailPage() {
     
     // Subscribe to messages
     const messagesQuery = query(
-      collection(db, "messages"),
-      where("chatId", "==", id),
+      collection(db, "chats", id as string, "messages"),
       orderBy("createdAt", "asc")
     )
     
@@ -140,7 +139,7 @@ export default function DashboardMessageDetailPage() {
     setSending(true)
     
     try {
-      // Add message to Firestore
+      // Add message to chat's messages subcollection
       const messageData = {
         chatId: id,
         senderId: user.uid,
@@ -148,7 +147,7 @@ export default function DashboardMessageDetailPage() {
         createdAt: serverTimestamp(),
       }
       
-      await addDoc(collection(db, "messages"), messageData)
+      await addDoc(collection(db, "chats", id as string, "messages"), messageData)
       
       // Update chat with last message
       await updateDoc(doc(db, "chats", id as string), {

@@ -18,7 +18,7 @@ import {
   where,
   orderBy,
 } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"

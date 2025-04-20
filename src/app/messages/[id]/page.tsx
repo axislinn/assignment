@@ -17,16 +17,19 @@ import {
   updateDoc,
   serverTimestamp,
   where,
+  increment,
+  writeBatch,
 } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowLeft, Send, User } from "lucide-react"
+import { ArrowLeft, Send, User, Check } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { subscribeToUserPresence } from "@/lib/firebase/presence"
 
 interface Message {
   id: string
@@ -34,6 +37,8 @@ interface Message {
   senderId: string
   text: string
   createdAt: any
+  read: boolean
+  readAt?: any
 }
 
 interface ChatParticipant {
@@ -63,118 +68,210 @@ export default function ChatPage() {
   const [messageText, setMessageText] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [isOtherUserOnline, setIsOtherUserOnline] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatInitialized = useRef(false)
+  const isInitialLoad = useRef(true)
+  const shouldScrollRef = useRef(false)
+
+  // Function to check if user is near bottom
+  const isNearBottom = () => {
+    const messageContainer = messagesEndRef.current?.parentElement
+    if (!messageContainer) return false
+    
+    const threshold = 100 // pixels from bottom
+    return messageContainer.scrollHeight - messageContainer.scrollTop - messageContainer.clientHeight <= threshold
+  }
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !id || chatInitialized.current) return
 
-    const fetchChatData = async () => {
+    chatInitialized.current = true
+    let messagesUnsubscribe: (() => void) | undefined
+
+    const initializeChat = async () => {
       try {
+        // First, fetch chat data
         const chatDoc = await getDoc(doc(db, "chats", id as string))
 
-        if (chatDoc.exists()) {
-          const chatData = { 
-            id: chatDoc.id, 
-            ...chatDoc.data() 
-          } as ChatData
-          setChat(chatData)
-
-          // Get the other participant's info
-          const otherParticipantId = chatData.participants.find((pid: string) => pid !== user.uid)
-          if (otherParticipantId) {
-            const userDoc = await getDoc(doc(db, "users", otherParticipantId))
-            if (userDoc.exists()) {
-              setOtherUser({
-                id: userDoc.id,
-                displayName: userDoc.data().displayName,
-                photoURL: userDoc.data().photoURL,
-              })
-            }
-          }
-        } else {
+        if (!chatDoc.exists()) {
           toast({
             title: "Chat not found",
             description: "The conversation you are looking for does not exist",
             variant: "destructive",
           })
+          setLoading(false)
+          return
+        }
+
+        const chatData = { 
+          id: chatDoc.id, 
+          ...chatDoc.data() 
+        } as ChatData
+        setChat(chatData)
+
+        // Get the other participant's info
+        const otherParticipantId = chatData.participants.find((pid: string) => pid !== user.uid)
+        if (otherParticipantId) {
+          const userDoc = await getDoc(doc(db, "users", otherParticipantId))
+          if (userDoc.exists()) {
+            setOtherUser({
+              id: userDoc.id,
+              displayName: userDoc.data().displayName,
+              photoURL: userDoc.data().photoURL,
+            })
+          }
+        }
+
+        // Set up messages subscription only after chat data is loaded
+        const messagesQuery = query(
+          collection(db, "chats", id as string, "messages"),
+          orderBy("createdAt", "asc")
+        )
+
+        messagesUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+          const messagesData = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Message[]
+
+          const wasNearBottom = isNearBottom()
+          setMessages(messagesData)
+
+          // Only scroll if it's initial load or user was already near bottom
+          if (isInitialLoad.current || wasNearBottom) {
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: isInitialLoad.current ? 'auto' : 'smooth' })
+              isInitialLoad.current = false
+            }, 100)
+          }
+        })
+
+        // Set up presence subscription
+        let presenceSub: (() => void) | undefined
+        if (chatData.participants) {
+          const otherUserId = chatData.participants.find(pid => pid !== user.uid)
+          if (otherUserId) {
+            presenceSub = subscribeToUserPresence(otherUserId, setIsOtherUserOnline)
+          }
+        }
+
+        setLoading(false)
+
+        return () => {
+          if (messagesUnsubscribe) messagesUnsubscribe()
+          if (presenceSub) presenceSub()
         }
       } catch (error) {
-        console.error("Error fetching chat:", error)
+        console.error("Error initializing chat:", error)
         toast({
           title: "Error",
           description: "Failed to load conversation",
           variant: "destructive",
         })
-      } finally {
         setLoading(false)
       }
     }
 
-    fetchChatData()
+    initializeChat()
 
-    // Subscribe to messages
-    const messagesQuery = query(collection(db, "messages"), where("chatId", "==", id), orderBy("createdAt", "asc"))
-
-    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const messagesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Message[]
-
-      setMessages(messagesData)
-
-      // Scroll to bottom when new messages arrive
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-      }, 100)
-    })
-
-    return () => unsubscribe()
+    return () => {
+      if (messagesUnsubscribe) messagesUnsubscribe()
+    }
   }, [id, user, toast])
 
-  useEffect(() => {
-    // Scroll to bottom on initial load
-    messagesEndRef.current?.scrollIntoView()
-  }, [loading])
-
-  const sendMessage = async (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!messageText.trim() || !user || !chat) return
 
     setSending(true)
+    const form = e.currentTarget
+    const messageToSend = messageText.trim()
+    shouldScrollRef.current = true
 
     try {
-      // Add message to Firestore
+      // Clear input immediately
+      setMessageText("")
+      form.reset()
+
+      // Add message to chat's messages subcollection
       const messageData = {
         chatId: id,
         senderId: user.uid,
-        text: messageText,
+        text: messageToSend,
         createdAt: serverTimestamp(),
+        read: false,
+        readAt: null
       }
 
-      await addDoc(collection(db, "messages"), messageData)
+      await addDoc(collection(db, "chats", id as string, "messages"), messageData)
 
-      // Update chat with last message
+      // Update chat with last message and unread status
       await updateDoc(doc(db, "chats", id as string), {
-        lastMessage: messageText,
+        lastMessage: messageToSend,
         lastMessageTime: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+        unreadCount: {
+          [chat.participants.find(pid => pid !== user.uid)]: increment(1)
+        }
       })
 
-      // Clear input
-      setMessageText("")
-    } catch (error) {
+      // Scroll to bottom after sending own message
+      if (shouldScrollRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }
+    } catch (error: any) {
       console.error("Error sending message:", error)
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive",
-      })
+      // Only show error toast if it's not a "document already exists" error
+      if (!error.message?.includes("Document already exists")) {
+        toast({
+          title: "Error",
+          description: "Failed to send message",
+          variant: "destructive",
+        })
+        // Restore the message text if sending failed
+        setMessageText(messageToSend)
+      }
     } finally {
       setSending(false)
+      shouldScrollRef.current = false
     }
   }
+
+  // Add useEffect to mark messages as read when viewed
+  useEffect(() => {
+    if (!user || !chat || messages.length === 0) return
+
+    const markMessagesAsRead = async () => {
+      const unreadMessages = messages.filter(
+        msg => !msg.read && msg.senderId !== user.uid
+      )
+
+      if (unreadMessages.length === 0) return
+
+      // Mark messages as read
+      const batch = writeBatch(db)
+      unreadMessages.forEach(msg => {
+        const msgRef = doc(db, "chats", id as string, "messages", msg.id)
+        batch.update(msgRef, { 
+          read: true,
+          readAt: serverTimestamp()
+        })
+      })
+
+      // Update chat unread count
+      const chatRef = doc(db, "chats", id as string)
+      batch.update(chatRef, {
+        [`unreadCount.${user.uid}`]: 0
+      })
+
+      await batch.commit()
+    }
+
+    markMessagesAsRead()
+  }, [messages, user, chat, id])
 
   if (!user) {
     return (
@@ -243,8 +340,10 @@ export default function ChatPage() {
             <div>
               <h2 className="font-semibold">{otherUser?.displayName || "User"}</h2>
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                <span className="text-xs text-muted-foreground">Online</span>
+                <div className={`h-2 w-2 rounded-full ${isOtherUserOnline ? "bg-green-500" : "bg-gray-400"}`}></div>
+                <span className="text-xs text-muted-foreground">
+                  {isOtherUserOnline ? "Online" : "Offline"}
+                </span>
               </div>
             </div>
           </div>
@@ -270,7 +369,17 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          ) : !chat ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-muted-foreground">Chat not found</p>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-muted-foreground">No messages yet</p>
@@ -289,13 +398,22 @@ export default function ChatPage() {
                     }`}
                   >
                     <p>{message.text}</p>
-                    <p
-                      className={`text-xs mt-1 ${isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"}`}
-                    >
-                      {message.createdAt
-                        ? formatDistanceToNow(new Date(message.createdAt.seconds * 1000), { addSuffix: true })
-                        : "Just now"}
-                    </p>
+                    <div className="flex items-center justify-between text-xs mt-1">
+                      <span className={isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"}>
+                        {message.createdAt
+                          ? formatDistanceToNow(new Date(message.createdAt.seconds * 1000), { addSuffix: true })
+                          : "Just now"}
+                      </span>
+                      {isOwnMessage && (
+                        <span className="ml-2">
+                          {message.read ? (
+                            <Check className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <Check className="h-4 w-4 text-gray-400" />
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -310,6 +428,7 @@ export default function ChatPage() {
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             className="flex-1"
+            disabled={sending}
           />
           <Button type="submit" disabled={sending || !messageText.trim()}>
             <Send className="h-4 w-4 mr-2" />

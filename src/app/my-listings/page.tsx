@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { collection, query, where, orderBy, getDocs, doc, deleteDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,6 +18,10 @@ interface Chat {
   productImage: string
   lastMessage: string | null
   lastMessageTime: any
+  lastMessageSenderId: string
+  unreadCount: {
+    [key: string]: number
+  }
 }
 
 export default function MessagesPage() {
@@ -114,7 +118,14 @@ export default function MessagesPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">{chat.lastMessage || "No messages yet"}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground truncate">{chat.lastMessage || "No messages yet"}</p>
+                        {chat.unreadCount?.[user.uid] > 0 && (
+                          <span className="ml-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
+                            {chat.unreadCount[user.uid]}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import type { Product } from "@/lib/types"
 
 interface ProductCardProps {

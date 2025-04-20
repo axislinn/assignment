@@ -1,6 +1,6 @@
 import { cookies } from "next/headers"
 import { cache } from "react"
-import { db } from "@/lib/firebase"
+import { db } from "@/lib/firebase/config"
 import { doc, getDoc } from "firebase/firestore"
 import { RequestCookies } from "next/dist/server/web/spec-extension/cookies"
 
