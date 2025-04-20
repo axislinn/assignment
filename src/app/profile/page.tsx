@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User } from 'lucide-react'
 import { AuthProvider } from "@/lib/auth-context"
+import { PasswordChangeForm } from "@/components/auth/password-change-form"
 
 const profileFormSchema = z.object({
   displayName: z.string().min(2, { message: "Display name must be at least 2 characters" }),
@@ -279,7 +280,7 @@ function ProfileContent() {
                 <div>
                   <h3 className="text-lg font-medium mb-2">Password</h3>
                   <p className="text-sm text-muted-foreground mb-4">Change your password to keep your account secure</p>
-                  <Button variant="outline">Change Password</Button>
+                  <PasswordChangeForm />
                 </div>
 
                 <div className="border-t pt-6">
