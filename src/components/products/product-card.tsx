@@ -73,7 +73,7 @@ export function ProductCard({ product, inWishlist = false }: ProductCardProps) {
     <Card className="overflow-hidden h-full flex flex-col">
       <div className="relative aspect-square">
         <Image
-          src={product.imageUrl || "/placeholder.svg?height=300&width=300"}
+          src={product.images?.[0] || "/placeholder.svg?height=300&width=300"}
           alt={product.title}
           fill
           className="object-cover"

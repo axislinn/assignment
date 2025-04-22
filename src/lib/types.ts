@@ -6,7 +6,7 @@ export interface Product {
   category: string
   condition: string
   location: string
-  imageUrl: string
+  images: string[]
   sellerId: string
   sellerName: string
   status: "pending" | "approved" | "rejected"

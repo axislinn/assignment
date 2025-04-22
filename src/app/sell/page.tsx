@@ -19,6 +19,8 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { supabase } from "@/lib/supabase"
 import { v4 as uuidv4 } from "uuid"
+import { uploadMultipleImages } from "@/lib/supabase/storage"
+import { syncSupabaseAuth } from "@/lib/supabase/auth"
 
 const formSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters" }).max(100),
@@ -66,8 +68,8 @@ export default function SellPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -83,42 +85,10 @@ export default function SellPage() {
   })
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setSelectedImage(file)
-      setImagePreview(URL.createObjectURL(file))
-    }
-  }
-
-  const uploadImageToSupabase = async (file: File): Promise<string> => {
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${uuidv4()}.${fileExt}`
-      const filePath = `product-images/${fileName}`
-
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage
-        .from('marketplace')
-        .upload(filePath, file)
-
-      if (uploadError) {
-        throw new Error('Error uploading image: ' + uploadError.message)
-      }
-
-      // getPublicUrl has no error, only data
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('marketplace')
-        .getPublicUrl(filePath)
-
-      if (!publicUrlData?.publicUrl) {
-        throw new Error('Failed to retrieve public URL.')
-      }
-
-      return publicUrlData.publicUrl
-    } catch (error: any) {
-      console.error('Upload failed:', error.message || error)
-      throw error
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      setSelectedImages(files)
+      setImagePreviews(files.map(file => URL.createObjectURL(file)))
     }
   }
 
@@ -145,10 +115,11 @@ export default function SellPage() {
     setIsLoading(true)
 
     try {
-      // Upload image to Supabase if selected
-      let imageUrl = null
-      if (selectedImage) {
-        imageUrl = await uploadImageToSupabase(selectedImage)
+      // Upload images to Supabase if selected
+      let imageUrls: string[] = []
+      if (selectedImages.length > 0) {
+        const uploadResults = await uploadMultipleImages(selectedImages)
+        imageUrls = uploadResults.map(result => result.url)
       }
 
       // Add product to Firestore
@@ -156,7 +127,7 @@ export default function SellPage() {
         ...values,
         sellerId: user.uid,
         sellerName: user.displayName,
-        imageUrl,
+        images: imageUrls,
         status: userRole === "admin" ? "approved" : "pending", // Auto-approve for admins
         createdAt: serverTimestamp(),
       }
@@ -375,21 +346,25 @@ export default function SellPage() {
               </div>
 
               <div>
-                <FormLabel htmlFor="image">Product Images</FormLabel>
+                <FormLabel htmlFor="images">Product Images</FormLabel>
                 <div className="mt-2 flex flex-col space-y-2">
-                  <Input id="image" type="file" accept="image/*" onChange={handleImageChange} />
+                  <Input id="images" type="file" accept="image/*" multiple onChange={handleImageChange} />
                   <FormDescription>Upload at least one clear image of your product</FormDescription>
                 </div>
 
-                {imagePreview && (
+                {imagePreviews.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Image Preview</p>
-                    <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-lg border border-dashed">
-                      <img
-                        src={imagePreview || "/placeholder.svg"}
-                        alt="Product preview"
-                        className="h-full w-full object-cover"
-                      />
+                    <p className="text-sm font-medium mb-2">Image Previews</p>
+                    <div className="flex flex-wrap gap-4">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative aspect-video w-40 h-40 overflow-hidden rounded-lg border border-dashed">
+                          <img
+                            src={preview}
+                            alt={`Product preview ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -206,7 +206,7 @@ export default function ProductDetailPage() {
           participants: [user.uid, product.sellerId],
           productId: product.id,
           productTitle: product.title,
-          productImage: product.imageUrl,
+          productImage: product.images?.[0] || "",
           createdAt: serverTimestamp(),
           lastMessage: null,
           lastMessageTime: null,
@@ -297,7 +297,7 @@ export default function ProductDetailPage() {
       productId: product.id,
       title: product.title,
       price: product.price,
-      image: product.imageUrl || "",
+      image: product.images?.[0] || "",
       quantity: 1,
       maxQuantity: product.inStockQuantity,
       sellerId: product.sellerId
@@ -342,7 +342,7 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <div className="relative aspect-square overflow-hidden rounded-lg border">
           <Image
-            src={product.imageUrl || "/placeholder.svg?height=600&width=600"}
+            src={product.images?.[0] || "/placeholder.svg?height=600&width=600"}
             alt={product.title}
             fill
             className="object-cover"

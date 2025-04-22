@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
                     <div className="flex flex-col md:flex-row gap-4">
                       <div className="relative aspect-square md:w-40 overflow-hidden rounded-md">
                         <img
-                          src={product.imageUrl || "/placeholder.svg?height=160&width=160"}
+                          src={product.images?.[0] || "/placeholder.svg?height=160&width=160"}
                           alt={product.title}
                           className="object-cover w-full h-full"
                         />
