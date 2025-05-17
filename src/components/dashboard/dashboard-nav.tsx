@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/lib/auth-context"
-import { LayoutDashboard, Package, ShoppingBag, Users, Settings, BarChart, MessageSquare, Heart, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingBag, Users, Settings, BarChart, MessageSquare, Heart, CreditCard, Receipt } from 'lucide-react'
 
-interface DashboardNavProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface DashboardNavProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function DashboardNav({ className, ...props }: DashboardNavProps) {
   const pathname = usePathname()
@@ -46,18 +46,24 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
       icon: MessageSquare,
       roles: ["admin", "seller", "buyer"],
     },
+
     {
-      title: "Wishlist",
-      href: "/dashboard/wishlist",
-      icon: Heart,
-      roles: ["buyer"],
+      title: "Receipt History",
+      href: "/dashboard/receipt-history",
+      icon: Receipt,
+      roles: ["admin", "seller", "buyer"],
     },
-    
     {
       title: "Users",
       href: "/dashboard/users",
       icon: Users,
       roles: ["admin"],
+    },
+    {
+      title: "Wishlist",
+      href: "/dashboard/wishlist",
+      icon: Heart,
+      roles: ["buyer"],
     },
     {
       title: "My Account",
@@ -74,7 +80,7 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
   ]
 
   // Filter items based on user role
-  const filteredNavItems = navItems.filter((item) => 
+  const filteredNavItems = navItems.filter((item) =>
     userRole ? item.roles.includes(userRole) : false
   )
 

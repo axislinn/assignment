@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { AuthProvider } from "@/lib/auth-context"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import {
   AlertDialog,
@@ -67,6 +67,7 @@ function CartContent() {
   const [showPaymentError, setShowPaymentError] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [showExportDialog, setShowExportDialog] = useState(false)
+  const [pendingReceipt, setPendingReceipt] = useState<any>(null)
 
   useEffect(() => {
     // Get cart item from sessionStorage
@@ -83,7 +84,7 @@ function CartContent() {
 
     // Ensure quantity is within limits
     const quantity = Math.max(1, Math.min(newQuantity, cartItem.maxQuantity))
-    
+
     setCartItem(prev => prev ? { ...prev, quantity } : null)
   }
 
@@ -101,32 +102,50 @@ function CartContent() {
       router.push("/auth/login?redirect=/cart")
       return
     }
-
     if (!cartItem) {
-      toast({
-        title: "Error",
-        description: "No items in cart",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "No items in cart", variant: "destructive" })
       return
     }
-
     if (!selectedPaymentMethod) {
       setShowPaymentError(true)
-      toast({
-        title: "Payment Method Required",
-        description: "Please select a payment method to proceed with checkout",
-        variant: "destructive",
-      })
+      toast({ title: "Payment Method Required", description: "Please select a payment method to proceed with checkout", variant: "destructive" })
       return
     }
-
     setShowPaymentError(false)
+
+    // Fetch seller name before showing modal
+    let sellerNameFetched = "Unknown Seller"
+    try {
+      const sellerDoc = await getDoc(doc(db, "users", cartItem.sellerId))
+      if (sellerDoc.exists()) {
+        sellerNameFetched = sellerDoc.data().displayName || "Unknown Seller"
+      }
+    } catch (e) { }
+    const receiptData = {
+      orderId: uuidv4(),
+      buyerId: user.uid,
+      buyerName: user.displayName || "Anonymous",
+      sellerId: cartItem.sellerId,
+      sellerName: sellerNameFetched,
+      productId: cartItem.productId,
+      productTitle: cartItem.title,
+      productImage: cartItem.image,
+      quantity: cartItem.quantity,
+      price: cartItem.price,
+      subtotal: cartItem.price * cartItem.quantity,
+      shipping: 5.99,
+      tax: (cartItem.price * cartItem.quantity) * 0.08,
+      total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
+      paymentMethod: selectedPaymentMethod,
+      status: "pending" as const
+    }
+    console.log('pendingReceipt for modal:', receiptData)
+    setPendingReceipt(receiptData)
     setShowReceipt(true)
   }
 
   const handleConfirmOrder = async () => {
-    if (!user || !cartItem) {
+    if (!user || !cartItem || !pendingReceipt) {
       toast({
         title: "Error",
         description: "Missing user or cart data",
@@ -134,40 +153,14 @@ function CartContent() {
       })
       return
     }
-
     setProcessing(true)
     try {
-      const orderId = uuidv4()
-      // Create receipt data
-      const receiptData = {
-        orderId,
-        buyerId: user.uid,
-        buyerName: user.displayName || "Anonymous",
-        sellerId: cartItem.sellerId,
-        productId: cartItem.productId,
-        productTitle: cartItem.title,
-        productImage: cartItem.image,
-        quantity: cartItem.quantity,
-        price: cartItem.price,
-        subtotal: cartItem.price * cartItem.quantity,
-        shipping: 5.99,
-        tax: (cartItem.price * cartItem.quantity) * 0.08,
-        total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-        paymentMethod: selectedPaymentMethod,
-        status: "pending" as const
-      }
-
-      // Add to receipt_history collection
-      await createReceipt(receiptData)
-
-      // Show success toast
+      await createReceipt(pendingReceipt)
       toast({
         title: "Order Confirmed",
         description: "Your order has been successfully placed!",
         variant: "success",
       })
-
-      // Close receipt dialog and show export dialog
       setShowReceipt(false)
       setShowExportDialog(true)
     } catch (error) {
@@ -182,27 +175,9 @@ function CartContent() {
   }
 
   const handleExportReceipt = () => {
-    if (!cartItem) return
-
-    const receiptData = {
-      orderId: uuidv4(),
-      buyerId: user?.uid || '',
-      buyerName: user?.displayName || 'Anonymous',
-      sellerId: cartItem.sellerId,
-      productId: cartItem.productId,
-      productTitle: cartItem.title,
-      productImage: cartItem.image,
-      quantity: cartItem.quantity,
-      price: cartItem.price,
-      subtotal: cartItem.price * cartItem.quantity,
-      shipping: 5.99,
-      tax: (cartItem.price * cartItem.quantity) * 0.08,
-      total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-      paymentMethod: selectedPaymentMethod,
-      status: "pending" as const
-    }
-
-    generateReceiptPDF(receiptData)
+    if (!pendingReceipt) return
+    console.log('pendingReceipt for PDF:', pendingReceipt)
+    generateReceiptPDF(pendingReceipt)
     setShowExportDialog(false)
     setCartItem(null)
     router.push('/products')
@@ -341,7 +316,7 @@ function CartContent() {
                 <span>Total</span>
                 <span>${total.toFixed(2)}</span>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">Payment Method</h3>
@@ -357,13 +332,12 @@ function CartContent() {
                         setSelectedPaymentMethod(method.id)
                         setShowPaymentError(false)
                       }}
-                      className={`flex items-center gap-2 rounded-lg border p-3 transition-colors ${
-                        selectedPaymentMethod === method.id
-                          ? 'border-primary bg-primary/10'
-                          : showPaymentError
+                      className={`flex items-center gap-2 rounded-lg border p-3 transition-colors ${selectedPaymentMethod === method.id
+                        ? 'border-primary bg-primary/10'
+                        : showPaymentError
                           ? 'border-destructive hover:border-destructive/50'
                           : 'border-border hover:border-primary/50'
-                      }`}
+                        }`}
                     >
                       <img
                         src={method.icon}
@@ -382,8 +356,8 @@ function CartContent() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={handleCheckout}
                 disabled={processing || !cartItem}
               >
@@ -416,22 +390,7 @@ function CartContent() {
         onClose={() => setShowReceipt(false)}
         onConfirm={handleConfirmOrder}
         onCancel={handleCancelOrder}
-        orderData={{
-          orderId: uuidv4(),
-          buyerId: user?.uid || '',
-          buyerName: user?.displayName || 'Anonymous',
-          sellerId: cartItem?.sellerId || '',
-          productId: cartItem?.productId || '',
-          productTitle: cartItem?.title || '',
-          productImage: cartItem?.image || '',
-          quantity: cartItem?.quantity || 0,
-          price: cartItem?.price || 0,
-          subtotal: (cartItem?.price || 0) * (cartItem?.quantity || 0),
-          shipping: 5.99,
-          tax: ((cartItem?.price || 0) * (cartItem?.quantity || 0)) * 0.08,
-          total: ((cartItem?.price || 0) * (cartItem?.quantity || 0)) + 5.99 + (((cartItem?.price || 0) * (cartItem?.quantity || 0)) * 0.08),
-          paymentMethod: selectedPaymentMethod,
-        }}
+        orderData={pendingReceipt}
       />
 
       <ExportReceiptDialog

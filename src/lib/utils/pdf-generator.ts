@@ -31,6 +31,10 @@ export function generateReceiptPDF(receipt: Omit<ReceiptHistory, 'createdAt' | '
   yPos += 7
   doc.text(`Date: ${format(new Date(), 'PPP')}`, margin, yPos)
   yPos += 7
+  doc.text(`Buyer: ${receipt.buyerName || ''}`, margin, yPos)
+  yPos += 7
+  doc.text(`Seller: ${receipt.sellerName || ''}`, margin, yPos)
+  yPos += 7
   doc.text(`Payment Method: ${receipt.paymentMethod}`, margin, yPos)
   yPos += 20
 

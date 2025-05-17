@@ -6,6 +6,7 @@ export interface ReceiptHistory {
   buyerId: string
   buyerName: string
   sellerId: string
+  sellerName: string
   productId: string
   productTitle: string
   productImage: string
@@ -29,7 +30,7 @@ export const createReceipt = async (receiptData: Omit<ReceiptHistory, 'createdAt
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }
-    
+
     const docRef = await addDoc(collection(db, 'receipt_history'), receiptWithTimestamps)
     return docRef.id
   } catch (error) {
