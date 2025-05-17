@@ -23,6 +23,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ReceiptVoucher } from "@/components/receipt-voucher"
+import { ExportReceiptDialog } from "@/components/export-receipt-dialog"
+import { createReceipt } from "@/lib/firebase/collections"
+import { v4 as uuidv4 } from 'uuid'
+import { generateReceiptPDF } from '@/lib/utils/pdf-generator'
 
 interface CartItem {
   productId: string
@@ -33,6 +38,14 @@ interface CartItem {
   maxQuantity: number
   sellerId: string
 }
+
+const PAYMENT_METHODS = [
+  { id: 'kbzpay', name: 'KBZPay', icon: '/payment-methods/KPay.png' },
+  { id: 'wavepay', name: 'WavePay', icon: '/payment-methods/WavePay.png' },
+  { id: 'ayapay', name: 'AYAPay', icon: '/payment-methods/Ayapay.jpg' },
+  { id: 'uabpay', name: 'UABPay', icon: '/payment-methods/UABPay.jpg' },
+  { id: 'cod', name: 'CoD', icon: '/payment-methods/COD.png' },
+]
 
 export default function CartPage() {
   return (
@@ -50,6 +63,10 @@ function CartContent() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('')
+  const [showPaymentError, setShowPaymentError] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
 
   useEffect(() => {
     // Get cart item from sessionStorage
@@ -94,10 +111,25 @@ function CartContent() {
       return
     }
 
-    if (!cartItem.sellerId) {
+    if (!selectedPaymentMethod) {
+      setShowPaymentError(true)
+      toast({
+        title: "Payment Method Required",
+        description: "Please select a payment method to proceed with checkout",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setShowPaymentError(false)
+    setShowReceipt(true)
+  }
+
+  const handleConfirmOrder = async () => {
+    if (!user || !cartItem) {
       toast({
         title: "Error",
-        description: "Missing seller information",
+        description: "Missing user or cart data",
         variant: "destructive",
       })
       return
@@ -105,8 +137,10 @@ function CartContent() {
 
     setProcessing(true)
     try {
-      // Create order data
-      const orderData = {
+      const orderId = uuidv4()
+      // Create receipt data
+      const receiptData = {
+        orderId,
         buyerId: user.uid,
         buyerName: user.displayName || "Anonymous",
         sellerId: cartItem.sellerId,
@@ -119,30 +153,24 @@ function CartContent() {
         shipping: 5.99,
         tax: (cartItem.price * cartItem.quantity) * 0.08,
         total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-        status: "pending",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        paymentMethod: selectedPaymentMethod,
+        status: "pending" as const
       }
 
-      console.log("Creating order with data:", orderData)
+      // Add to receipt_history collection
+      await createReceipt(receiptData)
 
-      // Add order to Firestore
-      const orderRef = await addDoc(collection(db, "orders"), orderData)
-      console.log("Order created with ID:", orderRef.id)
-
+      // Show success toast
       toast({
-        title: "Order Created",
-        description: "Your order has been successfully created!",
+        title: "Order Confirmed",
+        description: "Your order has been successfully placed!",
         variant: "success",
       })
 
-      // Clear cart after successful order creation
-      setCartItem(null)
-      
-      // Redirect to products browse page
-      router.push('/products')
+      // Close receipt dialog and show export dialog
+      setShowReceipt(false)
+      setShowExportDialog(true)
     } catch (error) {
-      console.error("Error creating order:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create order. Please try again.",
@@ -151,6 +179,43 @@ function CartContent() {
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handleExportReceipt = () => {
+    if (!cartItem) return
+
+    const receiptData = {
+      orderId: uuidv4(),
+      buyerId: user?.uid || '',
+      buyerName: user?.displayName || 'Anonymous',
+      sellerId: cartItem.sellerId,
+      productId: cartItem.productId,
+      productTitle: cartItem.title,
+      productImage: cartItem.image,
+      quantity: cartItem.quantity,
+      price: cartItem.price,
+      subtotal: cartItem.price * cartItem.quantity,
+      shipping: 5.99,
+      tax: (cartItem.price * cartItem.quantity) * 0.08,
+      total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
+      paymentMethod: selectedPaymentMethod,
+      status: "pending" as const
+    }
+
+    generateReceiptPDF(receiptData)
+    setShowExportDialog(false)
+    setCartItem(null)
+    router.push('/products')
+  }
+
+  const handleSkipExport = () => {
+    setShowExportDialog(false)
+    setCartItem(null)
+    router.push('/products')
+  }
+
+  const handleCancelOrder = () => {
+    setShowReceipt(false)
   }
 
   // Calculate totals
@@ -199,9 +264,14 @@ function CartContent() {
             <CardContent className="p-4">
               <div className="flex flex-col gap-4 sm:flex-row">
                 <img
-                  src={cartItem.image || "/placeholder.svg"}
+                  src={cartItem.image}
                   alt={cartItem.title}
                   className="h-24 w-24 rounded-md object-cover"
+                  onError={(e) => {
+                    console.error(`Failed to load cart item image: ${cartItem.image}`);
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/default-product.png';
+                  }}
                 />
                 <div className="flex-1">
                   <h3 className="font-medium">{cartItem.title}</h3>
@@ -271,6 +341,45 @@ function CartContent() {
                 <span>Total</span>
                 <span>${total.toFixed(2)}</span>
               </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">Payment Method</h3>
+                  {showPaymentError && (
+                    <span className="text-sm text-destructive">Please select a payment method</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {PAYMENT_METHODS.map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => {
+                        setSelectedPaymentMethod(method.id)
+                        setShowPaymentError(false)
+                      }}
+                      className={`flex items-center gap-2 rounded-lg border p-3 transition-colors ${
+                        selectedPaymentMethod === method.id
+                          ? 'border-primary bg-primary/10'
+                          : showPaymentError
+                          ? 'border-destructive hover:border-destructive/50'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <img
+                        src={method.icon}
+                        alt={method.name}
+                        className="h-8 w-8 object-contain"
+                        onError={(e) => {
+                          console.error(`Failed to load image: ${method.icon}`);
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/default-payment.png';
+                        }}
+                      />
+                      <span className="text-sm font-medium">{method.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </CardContent>
             <CardFooter>
               <Button 
@@ -301,6 +410,40 @@ function CartContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ReceiptVoucher
+        isOpen={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        onConfirm={handleConfirmOrder}
+        onCancel={handleCancelOrder}
+        orderData={{
+          orderId: uuidv4(),
+          buyerId: user?.uid || '',
+          buyerName: user?.displayName || 'Anonymous',
+          sellerId: cartItem?.sellerId || '',
+          productId: cartItem?.productId || '',
+          productTitle: cartItem?.title || '',
+          productImage: cartItem?.image || '',
+          quantity: cartItem?.quantity || 0,
+          price: cartItem?.price || 0,
+          subtotal: (cartItem?.price || 0) * (cartItem?.quantity || 0),
+          shipping: 5.99,
+          tax: ((cartItem?.price || 0) * (cartItem?.quantity || 0)) * 0.08,
+          total: ((cartItem?.price || 0) * (cartItem?.quantity || 0)) + 5.99 + (((cartItem?.price || 0) * (cartItem?.quantity || 0)) * 0.08),
+          paymentMethod: selectedPaymentMethod,
+        }}
+      />
+
+      <ExportReceiptDialog
+        isOpen={showExportDialog}
+        onClose={() => {
+          setShowExportDialog(false)
+          setCartItem(null)
+          router.push('/products')
+        }}
+        onExport={handleExportReceipt}
+        onSkip={handleSkipExport}
+      />
     </div>
   )
 }
