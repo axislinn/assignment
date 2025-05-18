@@ -14,54 +14,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
-
-interface Order {
-  id: string
-  buyerId: string
-  buyerName: string
-  productId: string
-  productTitle: string
-  productImage: string
-  quantity: number
-  price: number
-  total: number
-  status: string
-  createdAt: any
-}
+import { getUserNotifications, type Notification } from "@/lib/firebase/notifications"
+import { createReceipt } from "@/lib/firebase/collections"
+import { createNotification } from "@/lib/firebase/notifications"
+import { ReceiptVoucher } from "@/components/receipt-voucher"
+import { ExportReceiptDialog } from "@/components/export-receipt-dialog"
+import { generateReceiptPDF } from "@/lib/utils/pdf-generator"
+import type { ReceiptHistory } from "@/lib/firebase/collections"
+import { useRef } from "react"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export function NotificationsTab() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [pendingOrders, setPendingOrders] = useState<Order[]>([])
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [showAcceptDialog, setShowAcceptDialog] = useState(false)
-  const [showDenyDialog, setShowDenyDialog] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptHistory | null>(null)
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [clickedNotificationId, setClickedNotificationId] = useState<string | null>(null)
+  const [actionedNotificationId, setActionedNotificationId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
 
-    const fetchPendingOrders = async () => {
+    const fetchNotifications = async () => {
       try {
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("sellerId", "==", user.uid),
-          where("status", "==", "pending")
-        )
-        const snapshot = await getDocs(ordersQuery)
-        const orders = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Order[]
-        setPendingOrders(orders)
+        const userNotifications = await getUserNotifications(user.uid)
+        setNotifications(userNotifications)
       } catch (error) {
-        console.error("Error fetching pending orders:", error)
+        console.error("Error fetching notifications:", error)
         toast({
           title: "Error",
-          description: "Failed to load pending orders",
+          description: "Failed to load notifications",
           variant: "destructive",
         })
       } finally {
@@ -69,78 +57,142 @@ export function NotificationsTab() {
       }
     }
 
-    fetchPendingOrders()
+    fetchNotifications()
   }, [user, toast])
 
-  const handleAccept = async () => {
-    if (!selectedOrder) return
-
-    try {
-      const orderRef = doc(db, "orders", selectedOrder.id)
-      await updateDoc(orderRef, {
-        status: "confirmed",
-        updatedAt: serverTimestamp()
-      })
-
-      setPendingOrders(current => 
-        current.filter(order => order.id !== selectedOrder.id)
-      )
-
-      toast({
-        title: "Order Accepted",
-        description: "The order has been accepted successfully.",
-        variant: "success",
-      })
-    } catch (error) {
-      console.error("Error accepting order:", error)
-      // Only show error toast if it's a Firebase error
-      if (error instanceof Error && error.message.includes("Firebase")) {
-        toast({
-          title: "Error",
-          description: "Failed to accept order. Please try again.",
-          variant: "destructive",
+  const handleAccept = async (notification: Notification) => {
+    setActionedNotificationId(notification.id)
+    setTimeout(async () => {
+      try {
+        console.log("Debug - Current user:", {
+          uid: user?.uid
+        });
+        // Fetch order data for receipt
+        const orderDoc = await getDoc(doc(db, "orders", notification.orderId!));
+        const orderData = orderDoc.data();
+        if (!orderData) throw new Error("Order not found");
+        console.log("Debug - Order data:", {
+          orderId: notification.orderId,
+          sellerId: orderData.sellerId,
+          buyerId: orderData.buyerId,
+          currentUserId: user?.uid
+        });
+        // Update order status to confirmed
+        await updateDoc(doc(db, "orders", notification.orderId!), {
+          status: "confirmed",
+          updatedAt: new Date().toISOString()
         })
+        // Create receipt
+        await createReceipt({
+          orderId: notification.orderId!,
+          buyerId: orderData.buyerId,
+          buyerName: orderData.buyerName,
+          sellerId: orderData.sellerId,
+          sellerName: orderData.sellerName,
+          productId: orderData.productId,
+          productTitle: orderData.productTitle,
+          productImage: orderData.productImage,
+          quantity: orderData.quantity,
+          price: orderData.price,
+          subtotal: orderData.price * orderData.quantity,
+          shipping: 5.99,
+          tax: (orderData.price * orderData.quantity) * 0.08,
+          total: (orderData.price * orderData.quantity) + 5.99 + ((orderData.price * orderData.quantity) * 0.08),
+          paymentMethod: orderData.paymentMethod,
+          status: "completed"
+        })
+        // Notify buyer
+        await createNotification({
+          userId: orderData.buyerId,
+          type: "order_status",
+          title: "Order Accepted",
+          message: "Your order has been accepted! Click to see the receipt.",
+          read: false,
+          orderId: notification.orderId,
+          productId: orderData.productId,
+          link: `/orders/${notification.orderId}`
+        })
+        // Optionally, mark notification as read or remove it from UI
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
+        toast({ title: "Order accepted", description: "The buyer has been notified." })
+      } catch (error) {
+        console.error("Update error:", error);
+        toast({ title: "Error", description: error instanceof Error ? error.message : String(error) });
+      } finally {
+        setActionedNotificationId(null)
       }
-    }
-
-    setShowAcceptDialog(false)
-    setSelectedOrder(null)
+    }, 200)
   }
 
-  const handleDeny = async () => {
-    if (!selectedOrder) return
-
-    try {
-      const orderRef = doc(db, "orders", selectedOrder.id)
-      await updateDoc(orderRef, {
-        status: "rejected",
-        updatedAt: serverTimestamp()
-      })
-
-      setPendingOrders(current => 
-        current.filter(order => order.id !== selectedOrder.id)
-      )
-
-      toast({
-        title: "Order Denied",
-        description: "The order has been denied.",
-        variant: "success",
-      })
-    } catch (error) {
-      console.error("Error denying order:", error)
-      // Only show error toast if it's a Firebase error
-      if (error instanceof Error && error.message.includes("Firebase")) {
-        toast({
-          title: "Error",
-          description: "Failed to deny order. Please try again.",
-          variant: "destructive",
+  const handleDeny = async (notification: Notification) => {
+    setActionedNotificationId(notification.id)
+    setTimeout(async () => {
+      try {
+        // Update order status to rejected
+        await updateDoc(doc(db, "orders", notification.orderId!), {
+          status: "rejected",
+          updatedAt: new Date().toISOString()
         })
+        // Fetch order data
+        const orderDoc = await getDoc(doc(db, "orders", notification.orderId!))
+        const orderData = orderDoc.data()
+        if (!orderData) throw new Error("Order not found")
+        // Notify buyer
+        await createNotification({
+          userId: orderData.buyerId,
+          type: "order_status",
+          title: "Order Rejected",
+          message: "Your order was rejected by the seller.",
+          read: false,
+          orderId: notification.orderId,
+          productId: orderData.productId
+        })
+        setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
+        toast({ title: "Order denied", description: "The buyer has been notified." })
+      } catch (error) {
+        toast({ title: "Error", description: "Failed to deny order." })
+      } finally {
+        setActionedNotificationId(null)
+      }
+    }, 200)
+  }
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (
+      notification.type === "order_status" &&
+      notification.message.includes("accepted") &&
+      notification.orderId
+    ) {
+      setClickedNotificationId(notification.id)
+      setTimeout(() => setClickedNotificationId(null), 200)
+      try {
+        if (!user) return;
+        const q = query(
+          collection(db, "receipt_history"),
+          where("orderId", "==", notification.orderId),
+          where("buyerId", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const receiptData = snapshot.docs[0].data();
+          const receipt = { 
+            id: snapshot.docs[0].id,
+            ...receiptData 
+          } as unknown as ReceiptHistory;
+          setSelectedReceipt(receipt);
+          setShowReceiptModal(true);
+        } else {
+          toast({
+            title: "Receipt not found",
+            description: "No receipt found for this order.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error("[DEBUG] Error during receipt query:", err);
       }
     }
-
-    setShowDenyDialog(false)
-    setSelectedOrder(null)
-  }
+  };
 
   if (loading) {
     return (
@@ -150,11 +202,11 @@ export function NotificationsTab() {
     )
   }
 
-  if (pendingOrders.length === 0) {
+  if (notifications.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-48">
-          <p className="text-muted-foreground">No pending orders</p>
+          <p className="text-muted-foreground">No notifications</p>
         </CardContent>
       </Card>
     )
@@ -162,81 +214,143 @@ export function NotificationsTab() {
 
   return (
     <div className="space-y-4">
-      {pendingOrders.map((order) => (
-        <Card key={order.id}>
-          <CardHeader>
-            <CardTitle className="text-lg">New Order: {order.productTitle}</CardTitle>
-            <CardDescription>Order #{order.id.slice(0, 8)}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2">
-              <div className="flex items-center gap-4">
-                <img
-                  src={order.productImage || "/placeholder.svg"}
-                  alt={order.productTitle}
-                  className="h-16 w-16 rounded-md object-cover"
-                />
+      {notifications.map((notification) => {
+        const isBuyer = user?.uid === notification.userId;
+        const isAcceptedOrder =
+          notification.type === "order_status" &&
+          notification.message.includes("accepted") &&
+          notification.orderId;
+        const isBuyerAcceptedOrder = isAcceptedOrder && isBuyer;
+        const isSellerNewOrder = notification.type === "new_order";
+        const isRejectedOrder =
+          notification.type === "order_status" &&
+          notification.title === "Order Rejected";
+        const cardClass = [
+          notification.read ? "bg-card" : "bg-muted/20",
+          (isBuyerAcceptedOrder || isSellerNewOrder) ? "transition-transform duration-150" : "",
+          clickedNotificationId === notification.id ? "scale-95" : "",
+          actionedNotificationId === notification.id ? "opacity-50 scale-95 transition-all duration-200" : "",
+          isRejectedOrder && isBuyer ? "border-2 border-red-500 bg-transparent" : ""
+        ].join(" ");
+        return (
+          <Card
+            key={notification.id}
+            className={cardClass}
+            onClick={isBuyerAcceptedOrder ? () => handleNotificationClick(notification) : undefined}
+            style={isBuyerAcceptedOrder ? { cursor: "pointer", border: "2px solid #22c55e" } : {}}
+          >
+            <CardHeader>
+              <CardTitle className={isRejectedOrder && isBuyer ? "text-red-700 font-bold" : "text-lg"}>{notification.title}</CardTitle>
+              <CardDescription className={isRejectedOrder && isBuyer ? "text-white" : ""}>
+                {notification.createdAt.toLocaleDateString()} at {notification.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2">
+                <p className={isRejectedOrder && isBuyer ? "text-red-700" : "text-sm text-muted-foreground"}>{notification.message}</p>
+                {isSellerNewOrder && (
+                  <div className="flex gap-2 mt-2">
+                    <Button onClick={() => handleAccept(notification)} variant="default">Accept</Button>
+                    <Button onClick={() => handleDeny(notification)} variant="destructive">Deny</Button>
+                  </div>
+                )}
+                {isBuyerAcceptedOrder && (
+                  <span className="text-green-600 font-semibold">Click to view receipt</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+      {showReceiptModal && selectedReceipt && (
+        <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
+          <DialogContent className="max-w-[210mm] w-[210mm] p-8">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="text-center">
+                <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
+                <p className="text-sm text-muted-foreground">Order Receipt</p>
+                <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString()}</p>
+              </div>
+              {/* Order Details */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="font-medium">Buyer: {order.buyerName}</p>
-                  <p className="text-sm text-muted-foreground">Quantity: {order.quantity}</p>
-                  <p className="text-sm text-muted-foreground">Total: ${order.total.toFixed(2)}</p>
+                  <h3 className="font-medium">Order Information</h3>
+                  <p className="text-sm">Order ID: {selectedReceipt.orderId}</p>
+                  <p className="text-sm">Date: {new Date().toLocaleDateString()}</p>
+                  <p className="text-sm">Buyer: {selectedReceipt.buyerName}</p>
+                  <p className="text-sm">Seller: {selectedReceipt.sellerName}</p>
+                </div>
+                <div>
+                  <h3 className="font-medium">Payment Method</h3>
+                  <p className="text-sm capitalize">{selectedReceipt.paymentMethod}</p>
+                </div>
+              </div>
+              {/* Product Details */}
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-2">Product Details</h3>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={selectedReceipt.productImage}
+                    alt={selectedReceipt.productTitle}
+                    className="h-20 w-20 object-cover rounded"
+                  />
+                  <div>
+                    <p className="font-medium">{selectedReceipt.productTitle}</p>
+                    <p className="text-sm">Quantity: {selectedReceipt.quantity}</p>
+                    <p className="text-sm">Price: ${selectedReceipt.price.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+              {/* Price Breakdown */}
+              <h3 className="font-medium mb-2">Price Breakdown</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>${selectedReceipt.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>${selectedReceipt.shipping.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax</span>
+                  <span>${selectedReceipt.tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold border-t pt-2">
+                  <span>Total</span>
+                  <span>${selectedReceipt.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelectedOrder(order)
-                setShowDenyDialog(true)
-              }}
-            >
-              Deny
-            </Button>
-            <Button
-              onClick={() => {
-                setSelectedOrder(order)
-                setShowAcceptDialog(true)
-              }}
-            >
-              Accept
-            </Button>
-          </CardFooter>
-        </Card>
-      ))}
-
-      <AlertDialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Accept Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to accept this order? This will confirm the order and notify the buyer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAccept}>Accept</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showDenyDialog} onOpenChange={setShowDenyDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deny Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to deny this order? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeny} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Deny
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <DialogFooter className="flex justify-center mt-6">
+              <Button
+                onClick={() => {
+                  generateReceiptPDF(selectedReceipt);
+                  setShowReceiptModal(false);
+                }}
+                className="w-40"
+              >
+                Export to PDF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      <ExportReceiptDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        onExport={() => {
+          if (selectedReceipt) {
+            generateReceiptPDF(selectedReceipt);
+          }
+          setShowExportDialog(false);
+        }}
+        onSkip={() => setShowExportDialog(false)}
+      />
     </div>
   )
 } 

@@ -52,15 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fetch user role from Firestore
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid))
-          if (userDoc.exists()) {
+          if (userDoc.exists() && userDoc.data().role) {
             setUserRole(userDoc.data().role as UserRole)
           } else {
-            // Default to buyer if no role is set
-            setUserRole("buyer")
+            setUserRole(null)
           }
         } catch (error) {
           console.error("Error fetching user role:", error)
-          setUserRole("buyer")
+          setUserRole(null)
         }
       } else {
         setUserRole(null)
@@ -82,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await updateProfile(user, { displayName })
       }
 
-      // Create user document in Firestore
+      // Create user document in Firestore (set role only on registration)
       await setDoc(doc(db, "users", user.uid), {
         email: user.email,
         displayName: displayName || user.email?.split("@")[0],
@@ -108,13 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fetch user role from Firestore
       console.log("Fetching user role from Firestore...")
       const userDoc = await getDoc(doc(db, "users", user.uid))
-      if (userDoc.exists()) {
+      if (userDoc.exists() && userDoc.data().role) {
         const userData = userDoc.data()
         console.log("User role found:", userData.role)
         setUserRole(userData.role as UserRole)
       } else {
-        console.log("No user document found in Firestore, defaulting to buyer")
-        setUserRole("buyer")
+        setUserRole(null)
       }
     } catch (error: any) {
       console.error("Detailed sign-in error:", {
@@ -148,18 +146,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check if user exists in Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid))
 
-      if (!userDoc.exists()) {
-        // Create new user document with default role as buyer
+      if (userDoc.exists() && userDoc.data().role) {
+        // Use the existing role from Firestore
+        const userData = userDoc.data()
+        setUserRole(userData.role as UserRole)
+      } else if (!userDoc.exists()) {
+        // Create new user document with default role as null (or you can prompt for role selection)
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
-          role: "buyer",
           createdAt: new Date().toISOString(),
           approved: true,
         })
-
-        setUserRole("buyer")
+        setUserRole(null)
+      } else {
+        setUserRole(null)
       }
     } catch (error) {
       console.error("Error signing in with Google:", error)

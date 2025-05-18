@@ -56,6 +56,10 @@ export default function ReceiptHistoryPage() {
         if (authLoading || !user || !userRole) return;
         const fetchReceipts = async () => {
             try {
+                console.log("Fetching receipts for user:", {
+                    uid: user.uid,
+                    role: userRole
+                });
                 let q;
                 if (userRole === "admin") {
                     q = collection(db, "receipt_history");
@@ -64,13 +68,16 @@ export default function ReceiptHistoryPage() {
                 } else if (userRole === "seller") {
                     q = query(collection(db, "receipt_history"), where("sellerId", "==", user.uid));
                 } else {
+                    console.log("No valid role found:", userRole);
                     setReceipts([]);
                     setLoading(false);
                     return;
                 }
                 const querySnapshot = await getDocs(q);
-                const receiptsData = await Promise.all(querySnapshot.docs.map(async doc => {
-                    const data = doc.data();
+                console.log("Query snapshot size:", querySnapshot.size);
+                const receiptsData = await Promise.all(querySnapshot.docs.map(async docSnapshot => {
+                    const data = docSnapshot.data();
+                    console.log("Receipt data:", data);
                     // If seller name is missing, try to fetch it from users collection
                     let sellerName = data.sellerName;
                     if (!sellerName && data.sellerId) {
@@ -84,7 +91,7 @@ export default function ReceiptHistoryPage() {
                         }
                     }
                     return {
-                        id: doc.id,
+                        id: docSnapshot.id,
                         name: data.productTitle ?? "No name",
                         productPrice: data.price ?? 0,
                         buyingDate: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
@@ -92,9 +99,11 @@ export default function ReceiptHistoryPage() {
                         ...data
                     }
                 }));
+                console.log("Processed receipts data:", receiptsData);
                 receiptsData.sort((a, b) => b.buyingDate.getTime() - a.buyingDate.getTime())
                 setReceipts(receiptsData)
             } catch (error) {
+                console.error("Error fetching receipts:", error);
                 setError(error instanceof Error ? error.message : "Failed to fetch receipts")
             } finally {
                 setLoading(false)

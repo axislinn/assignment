@@ -24,6 +24,10 @@ export function ReceiptVoucher({
   onCancel,
   orderData,
 }: ReceiptVoucherProps) {
+  if (!orderData) {
+    return null;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
@@ -50,6 +54,8 @@ export function ReceiptVoucher({
                 <h3 className="font-medium">Order Information</h3>
                 <p className="text-sm">Order ID: {orderData.orderId}</p>
                 <p className="text-sm">Date: {format(new Date(), 'PPP')}</p>
+                <p className="text-sm">Buyer: {orderData.buyerName}</p>
+                <p className="text-sm">Seller: {orderData.sellerName}</p>
               </div>
               <div>
                 <h3 className="font-medium">Payment Method</h3>

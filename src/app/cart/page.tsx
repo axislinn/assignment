@@ -28,6 +28,7 @@ import { ExportReceiptDialog } from "@/components/export-receipt-dialog"
 import { createReceipt } from "@/lib/firebase/collections"
 import { v4 as uuidv4 } from 'uuid'
 import { generateReceiptPDF } from '@/lib/utils/pdf-generator'
+import { createNotification } from "@/lib/firebase/notifications"
 
 interface CartItem {
   productId: string
@@ -120,32 +121,27 @@ function CartContent() {
       if (sellerDoc.exists()) {
         sellerNameFetched = sellerDoc.data().displayName || "Unknown Seller"
       }
-    } catch (e) { }
-    const receiptData = {
-      orderId: uuidv4(),
-      buyerId: user.uid,
-      buyerName: user.displayName || "Anonymous",
-      sellerId: cartItem.sellerId,
+    } catch (e) {
+      console.error("Error fetching seller name:", e)
+    }
+    // Instead of showing receipt modal, go straight to confirm order
+    setPendingReceipt({
+      ...cartItem,
       sellerName: sellerNameFetched,
-      productId: cartItem.productId,
-      productTitle: cartItem.title,
-      productImage: cartItem.image,
-      quantity: cartItem.quantity,
-      price: cartItem.price,
+      paymentMethod: selectedPaymentMethod,
       subtotal: cartItem.price * cartItem.quantity,
       shipping: 5.99,
       tax: (cartItem.price * cartItem.quantity) * 0.08,
       total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-      paymentMethod: selectedPaymentMethod,
-      status: "pending" as const
-    }
-    console.log('pendingReceipt for modal:', receiptData)
-    setPendingReceipt(receiptData)
-    setShowReceipt(true)
+    });
+    await handleConfirmOrder({
+      sellerName: sellerNameFetched,
+      paymentMethod: selectedPaymentMethod
+    });
   }
 
-  const handleConfirmOrder = async () => {
-    if (!user || !cartItem || !pendingReceipt) {
+  const handleConfirmOrder = async (options?: { sellerName?: string, paymentMethod?: string }) => {
+    if (!user || !cartItem) {
       toast({
         title: "Error",
         description: "Missing user or cart data",
@@ -155,15 +151,57 @@ function CartContent() {
     }
     setProcessing(true)
     try {
-      await createReceipt(pendingReceipt)
+      // Create the order in Firestore (not the receipt)
+      const orderData = {
+        buyerId: user.uid,
+        buyerName: user.displayName || "Anonymous",
+        sellerId: cartItem.sellerId,
+        sellerName: options?.sellerName || "Unknown Seller",
+        productId: cartItem.productId,
+        productTitle: cartItem.title,
+        productImage: cartItem.image,
+        quantity: cartItem.quantity,
+        price: cartItem.price,
+        total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        paymentMethod: options?.paymentMethod || selectedPaymentMethod,
+      }
+      const orderRef = await addDoc(collection(db, "orders"), orderData)
+
+      // Notify the seller
+      await createNotification({
+        userId: cartItem.sellerId,
+        type: "new_order" as const,
+        title: "New Order Received",
+        message: `You have received a new order for ${cartItem.title} from ${user.displayName || "Anonymous"}`,
+        read: false,
+        orderId: orderRef.id,
+        productId: cartItem.productId,
+      })
+
+      // Notify the buyer (non-clickable, no link)
+      await createNotification({
+        userId: user.uid,
+        type: "order_status",
+        title: "Order Placed Successfully",
+        message: `Your order for ${cartItem.title} has been placed and is pending confirmation.`,
+        read: false,
+        orderId: orderRef.id,
+        productId: cartItem.productId
+      });
+
       toast({
-        title: "Order Confirmed",
-        description: "Your order has been successfully placed!",
+        title: "Order Submitted",
+        description: "Your order has been submitted and is pending seller confirmation.",
         variant: "success",
       })
       setShowReceipt(false)
-      setShowExportDialog(true)
+      setShowExportDialog(false)
+      setCartItem(null)
+      router.push('/products')
     } catch (error) {
+      console.error("Error creating order:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create order. Please try again.",

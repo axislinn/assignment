@@ -21,7 +21,7 @@ messaging.onBackgroundMessage((payload) => {
 
   const notificationTitle = payload.notification.title
   const notificationOptions = {
-    body: payload.notification.body,
+    body: payload.notification.body,  
     icon: "/logo.png",
     badge: "/badge.png",
     data: payload.data,

@@ -210,27 +210,11 @@ function ProfileContent() {
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Account Type</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select account type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="buyer">Buyer</SelectItem>
-                                <SelectItem value="seller">Seller</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Account Type (read-only, from Firestore) */}
+                      <div className="space-y-1">
+                        <FormLabel>Account Type</FormLabel>
+                        <Input value={userData?.role ? userData.role.charAt(0).toUpperCase() + userData.role.slice(1) : ''} disabled readOnly />
+                      </div>
 
                       <FormField
                         control={form.control}

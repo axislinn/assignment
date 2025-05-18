@@ -36,7 +36,7 @@ const RecentSales = dynamic(() => import("@/components/dashboard/recent-sales"),
 })
 
 function DashboardContent() {
-  const { user } = useAuth()
+  const { user, userRole } = useAuth()
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
   const [selectedTab, setSelectedTab] = useState("overview")
   const [date, setDate] = useState<DateRange | undefined>({
@@ -195,7 +195,7 @@ function DashboardContent() {
               </Card>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-              <Card className="col-span-4">
+              <Card className={userRole === "buyer" ? "col-span-7" : "col-span-4"}>
                 <CardHeader>
                   <CardTitle>Overview</CardTitle>
                 </CardHeader>
@@ -209,25 +209,27 @@ function DashboardContent() {
                   </Suspense>
                 </CardContent>
               </Card>
-              <Card className="col-span-3">
-                <CardHeader>
-                  <CardTitle>Recent Sales</CardTitle>
-                  <CardDescription>
-                    {monthlySalesCount !== null 
-                      ? `You made ${monthlySalesCount} sales this month.`
-                      : 'Loading sales data...'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Suspense fallback={
-                    <div className="flex items-center justify-center w-full h-[350px]">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div>
-                  }>
-                    <RecentSales />
-                  </Suspense>
-                </CardContent>
-              </Card>
+              {userRole !== "buyer" && (
+                <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Recent Sales</CardTitle>
+                    <CardDescription>
+                      {monthlySalesCount !== null 
+                        ? `You made ${monthlySalesCount} sales this month.`
+                        : 'Loading sales data...'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Suspense fallback={
+                      <div className="flex items-center justify-center w-full h-[350px]">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                      </div>
+                    }>
+                      <RecentSales />
+                    </Suspense>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
           <TabsContent value="notifications">
