@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
@@ -70,6 +70,23 @@ export default function SellPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImages, setSelectedImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/auth/login?redirect=/sell")
+      return
+    }
+
+    if (userRole === "buyer") {
+      toast({
+        title: "Access Denied",
+        description: "Buyers cannot list products. Please upgrade to a seller account.",
+        variant: "destructive"
+      })
+      router.push("/account/upgrade")
+      return
+    }
+  }, [user, userRole, router, toast])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

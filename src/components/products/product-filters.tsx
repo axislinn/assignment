@@ -48,8 +48,8 @@ export function ProductFilters() {
   const applyFilters = () => {
     const params = new URLSearchParams()
 
-    if (category) params.set("category", category)
-    if (location) params.set("location", location)
+    if (category && category !== "all") params.set("category", category)
+    if (location && location !== "all") params.set("location", location)
     if (priceRange[0] > 0) params.set("minPrice", priceRange[0].toString())
     if (priceRange[1] < 1000) params.set("maxPrice", priceRange[1].toString())
     if (searchQuery) params.set("q", searchQuery)

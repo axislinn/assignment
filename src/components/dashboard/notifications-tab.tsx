@@ -17,7 +17,7 @@ import {
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
-import { getUserNotifications, type Notification } from "@/lib/firebase/notifications"
+import { getUserNotifications, type Notification, deleteNotification } from "@/lib/firebase/notifications"
 import { createReceipt } from "@/lib/firebase/collections"
 import { createNotification } from "@/lib/firebase/notifications"
 import { ReceiptVoucher } from "@/components/receipt-voucher"
@@ -112,7 +112,9 @@ export function NotificationsTab() {
           productId: orderData.productId,
           link: `/orders/${notification.orderId}`
         })
-        // Optionally, mark notification as read or remove it from UI
+        // Delete the notification from database
+        await deleteNotification(notification.id)
+        // Remove from UI
         setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
         toast({ title: "Order accepted", description: "The buyer has been notified." })
       } catch (error) {
@@ -147,6 +149,9 @@ export function NotificationsTab() {
           orderId: notification.orderId,
           productId: orderData.productId
         })
+        // Delete the notification from database
+        await deleteNotification(notification.id)
+        // Remove from UI
         setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
         toast({ title: "Order denied", description: "The buyer has been notified." })
       } catch (error) {

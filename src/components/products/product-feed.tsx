@@ -37,12 +37,18 @@ function ProductFeedContent() {
 
         let productsQuery = query(
           collection(db, "products"),
-          where("status", "==", "approved"),
-          orderBy("createdAt", "desc"),
-          limit(20),
+          where("status", "==", "approved")
         )
 
-        if (category) {
+        // Apply filters in a specific order to match the composite index
+        if (location && location !== "all") {
+          productsQuery = query(
+            productsQuery,
+            where("location", "==", location)
+          )
+        }
+
+        if (category && category !== "all") {
           productsQuery = query(productsQuery, where("category", "==", category))
         }
 
@@ -50,7 +56,7 @@ function ProductFeedContent() {
           productsQuery = query(
             productsQuery,
             where("price", ">=", Number(minPrice)),
-            where("price", "<=", Number(maxPrice)),
+            where("price", "<=", Number(maxPrice))
           )
         } else if (minPrice) {
           productsQuery = query(productsQuery, where("price", ">=", Number(minPrice)))
@@ -58,9 +64,12 @@ function ProductFeedContent() {
           productsQuery = query(productsQuery, where("price", "<=", Number(maxPrice)))
         }
 
-        if (location) {
-          productsQuery = query(productsQuery, where("location", "==", location))
-        }
+        // Add ordering and limit at the end
+        productsQuery = query(
+          productsQuery,
+          orderBy("createdAt", "desc"),
+          limit(20)
+        )
 
         const querySnapshot = await getDocs(productsQuery)
         const productsData = querySnapshot.docs.map((doc) => ({

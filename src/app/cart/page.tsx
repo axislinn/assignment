@@ -57,7 +57,7 @@ export default function CartPage() {
 }
 
 function CartContent() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, userRole } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const [cartItem, setCartItem] = useState<CartItem | null>(null)
@@ -103,6 +103,16 @@ function CartContent() {
       router.push("/auth/login?redirect=/cart")
       return
     }
+
+    if (userRole === "seller") {
+      toast({
+        title: "Access Denied",
+        description: "Sellers cannot purchase products. Please use a buyer account.",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (!cartItem) {
       toast({ title: "Error", description: "No items in cart", variant: "destructive" })
       return
