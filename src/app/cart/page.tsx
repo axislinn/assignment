@@ -161,7 +161,7 @@ function CartContent() {
     }
     setProcessing(true)
     try {
-      // Create the order in Firestore (not the receipt)
+      // Create the order in Firestore with confirmed status
       const orderData = {
         buyerId: user.uid,
         buyerName: user.displayName || "Anonymous",
@@ -173,37 +173,58 @@ function CartContent() {
         quantity: cartItem.quantity,
         price: cartItem.price,
         total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-        status: "pending",
+        status: "confirmed", // Changed from "pending" to "confirmed"
         createdAt: new Date().toISOString(),
         paymentMethod: options?.paymentMethod || selectedPaymentMethod,
       }
       const orderRef = await addDoc(collection(db, "orders"), orderData)
 
+      // Create receipt immediately
+      await createReceipt({
+        orderId: orderRef.id,
+        buyerId: user.uid,
+        buyerName: user.displayName || "Anonymous",
+        sellerId: cartItem.sellerId,
+        sellerName: options?.sellerName || "Unknown Seller",
+        productId: cartItem.productId,
+        productTitle: cartItem.title,
+        productImage: cartItem.image,
+        quantity: cartItem.quantity,
+        price: cartItem.price,
+        subtotal: cartItem.price * cartItem.quantity,
+        shipping: 5.99,
+        tax: (cartItem.price * cartItem.quantity) * 0.08,
+        total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
+        paymentMethod: options?.paymentMethod || selectedPaymentMethod,
+        status: "completed"
+      })
+
       // Notify the seller
       await createNotification({
         userId: cartItem.sellerId,
-        type: "new_order" as const,
-        title: "New Order Received",
-        message: `You have received a new order for ${cartItem.title} from ${user.displayName || "Anonymous"}`,
+        type: "order_status",
+        title: "New Confirmed Order",
+        message: `You have received a new confirmed order for ${cartItem.title} from ${user.displayName || "Anonymous"}`,
         read: false,
         orderId: orderRef.id,
         productId: cartItem.productId,
       })
 
-      // Notify the buyer (non-clickable, no link)
+      // Notify the buyer
       await createNotification({
         userId: user.uid,
         type: "order_status",
-        title: "Order Placed Successfully",
-        message: `Your order for ${cartItem.title} has been placed and is pending confirmation.`,
+        title: "Order Confirmed",
+        message: `Your order for ${cartItem.title} has been confirmed. Click to view receipt.`,
         read: false,
         orderId: orderRef.id,
-        productId: cartItem.productId
+        productId: cartItem.productId,
+        link: `/orders/${orderRef.id}`
       });
 
       toast({
-        title: "Order Submitted",
-        description: "Your order has been submitted and is pending seller confirmation.",
+        title: "Order Confirmed",
+        description: "Your order has been confirmed and the receipt is ready.",
         variant: "success",
       })
       setShowReceipt(false)

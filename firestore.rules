@@ -42,6 +42,12 @@ service cloud.firestore {
         (isSeller() && resource.data.sellerId == request.auth.uid);
     }
     
+    // Wishlists collection
+    match /wishlists/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+    
     // Orders collection
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
@@ -98,6 +104,7 @@ service cloud.firestore {
         (isAuthenticated() && (
           request.resource.data.userId == request.auth.uid ||
           (request.resource.data.type == "new_order" && request.resource.data.orderId != null) ||
+          (request.resource.data.type == "order_status" && request.resource.data.orderId != null) ||
           (
             request.resource.data.type == "order_status" &&
             request.resource.data.orderId != null &&

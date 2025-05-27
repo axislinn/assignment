@@ -30,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { StarRating } from "@/components/star-rating"
 import { Heart, MessageSquare, ShoppingCart, User } from 'lucide-react'
 import type { Product, Review } from "@/lib/types"
+import { toggleWishlist, isInWishlist } from "@/lib/firebase/wishlist"
 
 interface ChatData {
   id: string
@@ -97,10 +98,8 @@ export default function ProductDetailPage() {
 
           // Check if in user's wishlist
           if (user) {
-            const userDoc = await getDoc(doc(db, "users", user.uid))
-            if (userDoc.exists() && userDoc.data().wishlist) {
-              setInWishlist(userDoc.data().wishlist.includes(id))
-            }
+            const isWishlisted = await isInWishlist(user.uid, id as string)
+            setInWishlist(isWishlisted)
           }
         } else {
           toast({
@@ -125,7 +124,7 @@ export default function ProductDetailPage() {
     fetchProductData()
   }, [id, user, router, toast])
 
-  const toggleWishlist = async () => {
+  const handleToggleWishlist = async () => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -137,27 +136,14 @@ export default function ProductDetailPage() {
     }
 
     try {
-      const userRef = doc(db, "users", user.uid)
-
-      if (inWishlist) {
-        await updateDoc(userRef, {
-          wishlist: arrayRemove(id),
-        })
-        setInWishlist(false)
-        toast({
-          title: "Removed from wishlist",
-          description: `${product?.title} has been removed from your wishlist`,
-        })
-      } else {
-        await updateDoc(userRef, {
-          wishlist: arrayUnion(id),
-        })
-        setInWishlist(true)
-        toast({
-          title: "Added to wishlist",
-          description: `${product?.title} has been added to your wishlist`,
-        })
-      }
+      const wasAdded = await toggleWishlist(user.uid, id as string)
+      setInWishlist(wasAdded)
+      toast({
+        title: wasAdded ? "Added to wishlist" : "Removed from wishlist",
+        description: wasAdded 
+          ? `${product?.title} has been added to your wishlist`
+          : `${product?.title} has been removed from your wishlist`,
+      })
     } catch (error) {
       console.error("Error updating wishlist:", error)
       toast({
@@ -307,7 +293,7 @@ export default function ProductDetailPage() {
     sessionStorage.setItem('cartItem', JSON.stringify(cartItem))
     
     // Redirect to cart page
-    router.push('/cart')
+    router.push('/')
   }
 
   if (loading) {
@@ -355,7 +341,7 @@ export default function ProductDetailPage() {
           <div>
             <div className="flex justify-between items-start">
               <h1 className="text-2xl md:text-3xl font-bold">{product.title}</h1>
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={toggleWishlist}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleToggleWishlist}>
                 <Heart className={`h-5 w-5 md:h-6 md:w-6 ${inWishlist ? "fill-red-500 text-red-500" : ""}`} />
                 <span className="sr-only">Add to wishlist</span>
               </Button>
@@ -412,7 +398,7 @@ export default function ProductDetailPage() {
               <MessageSquare className="mr-2 h-4 w-4" />
               Contact Seller
             </Button>
-            <Button className="flex-1" variant="secondary" onClick={toggleWishlist}>
+            <Button className="flex-1" variant="secondary" onClick={handleToggleWishlist}>
               <Heart className={`mr-2 h-4 w-4 ${inWishlist ? "fill-red-500 text-red-500" : ""}`} />
               {inWishlist ? "Saved" : "Save"}
             </Button>

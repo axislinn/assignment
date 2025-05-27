@@ -67,7 +67,7 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
     },
     {
       title: "My Account",
-      href: "/dashboard/account",
+      href: "/profile",
       icon: Users, // You can use another icon like User if available
       roles: ["admin", "seller", "buyer"],
     },

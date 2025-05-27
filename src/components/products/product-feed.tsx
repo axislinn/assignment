@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { ProductCard } from "./product-card"
 import { ProductFilters } from "./product-filters"
 import type { Product } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth, AuthProvider } from "@/lib/auth-context"
+import { useAuth } from "@/lib/auth-context"
+import { getWishlist } from "@/lib/firebase/wishlist"
 
 function ProductFeedContent() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [wishlist, setWishlist] = useState<string[]>([])
+  const [wishlistItems, setWishlistItems] = useState<Product[]>([])
   const searchParams = useSearchParams()
   const { user } = useAuth()
 
@@ -29,10 +30,8 @@ function ProductFeedContent() {
       try {
         // Fetch user's wishlist if logged in
         if (user) {
-          const userDoc = await getDoc(doc(db, "users", user.uid))
-          if (userDoc.exists() && userDoc.data().wishlist) {
-            setWishlist(userDoc.data().wishlist)
-          }
+          const wishlist = await getWishlist(user.uid)
+          setWishlistItems(wishlist)
         }
 
         let productsQuery = query(
@@ -125,7 +124,11 @@ function ProductFeedContent() {
       ) : (
         <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} inWishlist={wishlist.includes(product.id)} />
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              inWishlist={wishlistItems.some(item => item.id === product.id)} 
+            />
           ))}
         </div>
       )}
@@ -134,9 +137,5 @@ function ProductFeedContent() {
 }
 
 export function ProductFeed() {
-  return (
-    <AuthProvider>
-      <ProductFeedContent />
-    </AuthProvider>
-  )
+  return <ProductFeedContent />
 }

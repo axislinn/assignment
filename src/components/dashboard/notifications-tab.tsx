@@ -61,6 +61,7 @@ export function NotificationsTab() {
   }, [user, toast])
 
   const handleAccept = async (notification: Notification) => {
+    /* Commented out accept functionality
     setActionedNotificationId(notification.id)
     setTimeout(async () => {
       try {
@@ -124,9 +125,11 @@ export function NotificationsTab() {
         setActionedNotificationId(null)
       }
     }, 200)
+    */
   }
 
   const handleDeny = async (notification: Notification) => {
+    /* Commented out deny functionality
     setActionedNotificationId(notification.id)
     setTimeout(async () => {
       try {
@@ -160,14 +163,11 @@ export function NotificationsTab() {
         setActionedNotificationId(null)
       }
     }, 200)
+    */
   }
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (
-      notification.type === "order_status" &&
-      notification.message.includes("accepted") &&
-      notification.orderId
-    ) {
+    if (notification.type === "order_status" && notification.orderId) {
       setClickedNotificationId(notification.id)
       setTimeout(() => setClickedNotificationId(null), 200)
       try {
@@ -221,18 +221,13 @@ export function NotificationsTab() {
     <div className="space-y-4">
       {notifications.map((notification) => {
         const isBuyer = user?.uid === notification.userId;
-        const isAcceptedOrder =
-          notification.type === "order_status" &&
-          notification.message.includes("accepted") &&
-          notification.orderId;
-        const isBuyerAcceptedOrder = isAcceptedOrder && isBuyer;
-        const isSellerNewOrder = notification.type === "new_order";
+        const isOrderNotification = notification.type === "order_status" && notification.orderId;
         const isRejectedOrder =
           notification.type === "order_status" &&
           notification.title === "Order Rejected";
         const cardClass = [
           notification.read ? "bg-card" : "bg-muted/20",
-          (isBuyerAcceptedOrder || isSellerNewOrder) ? "transition-transform duration-150" : "",
+          isOrderNotification ? "transition-transform duration-150" : "",
           clickedNotificationId === notification.id ? "scale-95" : "",
           actionedNotificationId === notification.id ? "opacity-50 scale-95 transition-all duration-200" : "",
           isRejectedOrder && isBuyer ? "border-2 border-red-500 bg-transparent" : ""
@@ -241,8 +236,8 @@ export function NotificationsTab() {
           <Card
             key={notification.id}
             className={cardClass}
-            onClick={isBuyerAcceptedOrder ? () => handleNotificationClick(notification) : undefined}
-            style={isBuyerAcceptedOrder ? { cursor: "pointer", border: "2px solid #22c55e" } : {}}
+            onClick={isOrderNotification ? () => handleNotificationClick(notification) : undefined}
+            style={isOrderNotification ? { cursor: "pointer", border: "2px solid #22c55e" } : {}}
           >
             <CardHeader>
               <CardTitle className={isRejectedOrder && isBuyer ? "text-red-700 font-bold" : "text-lg"}>{notification.title}</CardTitle>
@@ -253,13 +248,7 @@ export function NotificationsTab() {
             <CardContent>
               <div className="grid gap-2">
                 <p className={isRejectedOrder && isBuyer ? "text-red-700" : "text-sm text-muted-foreground"}>{notification.message}</p>
-                {isSellerNewOrder && (
-                  <div className="flex gap-2 mt-2">
-                    <Button onClick={() => handleAccept(notification)} variant="default">Accept</Button>
-                    <Button onClick={() => handleDeny(notification)} variant="destructive">Deny</Button>
-                  </div>
-                )}
-                {isBuyerAcceptedOrder && (
+                {isOrderNotification && (
                   <span className="text-green-600 font-semibold">Click to view receipt</span>
                 )}
               </div>

@@ -3,28 +3,29 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Heart } from "lucide-react"
+import { Heart, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/use-toast"
-import { doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore"
-import { db } from "@/lib/firebase/config"
+import { toggleWishlist } from "@/lib/firebase/wishlist"
 import type { Product } from "@/lib/types"
 
 interface ProductCardProps {
   product: Product
   inWishlist?: boolean
+  showRemoveButton?: boolean
+  onRemove?: () => void
 }
 
-export function ProductCard({ product, inWishlist = false }: ProductCardProps) {
+export function ProductCard({ product, inWishlist = false, showRemoveButton = false, onRemove }: ProductCardProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [isInWishlist, setIsInWishlist] = useState(inWishlist)
   const [isLoading, setIsLoading] = useState(false)
 
-  const toggleWishlist = async () => {
+  const handleToggleWishlist = async () => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -36,27 +37,17 @@ export function ProductCard({ product, inWishlist = false }: ProductCardProps) {
 
     setIsLoading(true)
     try {
-      const userRef = doc(db, "users", user.uid)
-
-      if (isInWishlist) {
-        await updateDoc(userRef, {
-          wishlist: arrayRemove(product.id),
-        })
-        setIsInWishlist(false)
-        toast({
-          title: "Removed from wishlist",
-          description: `${product.title} has been removed from your wishlist`,
-        })
-      } else {
-        await updateDoc(userRef, {
-          wishlist: arrayUnion(product.id),
-        })
-        setIsInWishlist(true)
-        toast({
-          title: "Added to wishlist",
-          description: `${product.title} has been added to your wishlist`,
-        })
+      const wasAdded = await toggleWishlist(user.uid, product.id)
+      setIsInWishlist(wasAdded)
+      if (onRemove) {
+        onRemove()
       }
+      toast({
+        title: wasAdded ? "Added to wishlist" : "Removed from wishlist",
+        description: wasAdded 
+          ? `${product.title} has been added to your wishlist`
+          : `${product.title} has been removed from your wishlist`,
+      })
     } catch (error) {
       console.error("Error updating wishlist:", error)
       toast({
@@ -78,16 +69,31 @@ export function ProductCard({ product, inWishlist = false }: ProductCardProps) {
           fill
           className="object-cover"
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-2 right-2 bg-white/80 hover:bg-white/90 rounded-full dark:bg-gray-800/80 dark:hover:bg-gray-800/90"
-          onClick={toggleWishlist}
-          disabled={isLoading}
-        >
-          <Heart className={`h-5 w-5 ${isInWishlist ? "fill-red-500 text-red-500" : ""}`} />
-          <span className="sr-only">Add to wishlist</span>
-        </Button>
+        <div className="absolute top-2 right-2 flex gap-2">
+          {showRemoveButton ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-white/80 hover:bg-white/90 rounded-full dark:bg-gray-800/80 dark:hover:bg-gray-800/90"
+              onClick={handleToggleWishlist}
+              disabled={isLoading}
+            >
+              <X className="h-5 w-5 text-red-500" />
+              <span className="sr-only">Remove from wishlist</span>
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-white/80 hover:bg-white/90 rounded-full dark:bg-gray-800/80 dark:hover:bg-gray-800/90"
+              onClick={handleToggleWishlist}
+              disabled={isLoading}
+            >
+              <Heart className={`h-5 w-5 ${isInWishlist ? "fill-red-500 text-red-500" : ""}`} />
+              <span className="sr-only">Add to wishlist</span>
+            </Button>
+          )}
+        </div>
       </div>
       <CardContent className="p-4 flex-grow">
         <div className="flex justify-between items-start mb-2">
