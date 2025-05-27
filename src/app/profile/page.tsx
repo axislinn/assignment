@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User } from 'lucide-react'
 import { AuthProvider } from "@/lib/auth-context"
 import { PasswordChangeForm } from "@/components/auth/password-change-form"
+import { Label as UILabel } from "@/components/ui/label"
 
 const profileFormSchema = z.object({
   displayName: z.string().min(2, { message: "Display name must be at least 2 characters" }),
@@ -35,8 +36,8 @@ function ProfileContent() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [userData, setUserData] = useState<any>(null)
-
-  console.log("Auth state:", { user, loading, userRole }) // Debug log
+  const [displayName, setDisplayName] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
@@ -51,17 +52,13 @@ function ProfileContent() {
 
   useEffect(() => {
     if (loading) {
-      console.log("Auth is still loading...") // Debug log
       return
     }
 
     if (!user) {
-      console.log("No user found, redirecting to login...") // Debug log
-      router.push("/auth/login?redirect=/profile")
+      router.push("/login")
       return
     }
-
-    console.log("User found, fetching data...") // Debug log
 
     const fetchUserData = async () => {
       try {
@@ -69,28 +66,17 @@ function ProfileContent() {
         if (userDoc.exists()) {
           const data = userDoc.data()
           setUserData(data)
-          console.log("User data fetched:", data) // Debug log
-
-          form.reset({
-            displayName: user.displayName || "",
-            email: user.email || "",
-            role: (data.role as "buyer" | "seller") || "buyer",
-            location: data.location || "",
-            bio: data.bio || "",
-          })
+          setDisplayName(data.displayName || "")
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load your profile data",
-          variant: "destructive",
-        })
+        setError("Failed to fetch user data")
+      } finally {
+        setIsLoading(false)
       }
     }
 
     fetchUserData()
-  }, [user, loading, router, toast, form])
+  }, [user, loading, router])
 
   if (loading) {
     return (
@@ -106,39 +92,22 @@ function ProfileContent() {
     return null
   }
 
-  async function onSubmit(values: z.infer<typeof profileFormSchema>) {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
     if (!user) return
 
-    setIsLoading(true)
-
     try {
-      // Update Firebase Auth profile
-      await updateProfile(auth.currentUser!, {
-        displayName: values.displayName,
-      })
-
-      // Update Firestore user document
       await updateDoc(doc(db, "users", user.uid), {
-        displayName: values.displayName,
-        role: values.role,
-        location: values.location || "",
-        bio: values.bio || "",
-        updatedAt: new Date().toISOString(),
+        displayName,
+        updatedAt: new Date().toISOString()
       })
 
       toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully",
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully."
       })
     } catch (error) {
-      console.error("Error updating profile:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update your profile",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+      setError("Failed to update profile")
     }
   }
 
@@ -181,7 +150,7 @@ function ProfileContent() {
                 </CardHeader>
                 <CardContent>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <form onSubmit={handleUpdateProfile} className="space-y-6">
                       <FormField
                         control={form.control}
                         name="displayName"
@@ -189,7 +158,7 @@ function ProfileContent() {
                           <FormItem>
                             <FormLabel>Display Name</FormLabel>
                             <FormControl>
-                              <Input {...field} />
+                              <Input {...field} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

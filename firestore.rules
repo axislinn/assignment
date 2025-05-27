@@ -63,9 +63,11 @@ service cloud.firestore {
     }
     
     // Cart collection
-    match /carts/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isBuyer() && isOwner(userId);
+    match /carts/{cartId} {
+      allow read: if isAuthenticated() && resource.data.buyerId == request.auth.uid;
+      allow create: if isBuyer() && request.resource.data.buyerId == request.auth.uid;
+      allow update: if isBuyer() && resource.data.buyerId == request.auth.uid;
+      allow delete: if isBuyer() && resource.data.buyerId == request.auth.uid;
     }
     
     // Reviews collection
@@ -100,17 +102,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
                   resource.data.userId == request.auth.uid;
       
-      allow create: if isAdmin() ||
-        (isAuthenticated() && (
-          request.resource.data.userId == request.auth.uid ||
-          (request.resource.data.type == "new_order" && request.resource.data.orderId != null) ||
-          (request.resource.data.type == "order_status" && request.resource.data.orderId != null) ||
-          (
-            request.resource.data.type == "order_status" &&
-            request.resource.data.orderId != null &&
-            get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.sellerId == request.auth.uid
-          )
-        ));
+      // UPDATED: allow buyers to create order_status notifications for sellers
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        (request.resource.data.type == "order_status" && request.resource.data.orderId != null)
+      );
       
       allow update: if isAuthenticated() && 
                     resource.data.userId == request.auth.uid;
@@ -123,22 +119,16 @@ service cloud.firestore {
     match /receipt_history/{receiptId} {
       allow read: if isAuthenticated() && (
         resource.data.buyerId == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid ||
         isAdmin()
       );
       allow create: if isAuthenticated() && (
-        request.resource.data.buyerId == request.auth.uid ||
-        request.resource.data.sellerId == request.auth.uid
+        request.resource.data.buyerId == request.auth.uid
       );
       allow update: if isAdmin() || 
         (isOwner(resource.data.buyerId) && 
          (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status']))) ||
-        (isSeller() && 
-         resource.data.sellerId == request.auth.uid && 
-         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt']));
+          .hasOnly(['status'])));
       allow delete: if isAdmin();
     }
   }
-} 
+}

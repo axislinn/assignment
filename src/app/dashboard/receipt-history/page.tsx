@@ -25,7 +25,6 @@ interface Receipt {
     name: string
     productPrice: number
     buyingDate: Date
-    // Add all fields needed for the voucher/pdf
     orderId?: string
     buyerId?: string
     buyerName?: string
@@ -52,33 +51,33 @@ export default function ReceiptHistoryPage() {
     const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
     const [showModal, setShowModal] = useState(false)
 
+    // Block sellers immediately
+    if (!authLoading && userRole === "seller") {
+        return (
+            <div className="flex flex-col items-center justify-center h-64">
+                <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+                <p className="text-muted-foreground">Sellers do not have access to receipt history.</p>
+            </div>
+        );
+    }
+
     useEffect(() => {
         if (authLoading || !user || !userRole) return;
         const fetchReceipts = async () => {
             try {
-                console.log("Fetching receipts for user:", {
-                    uid: user.uid,
-                    role: userRole
-                });
                 let q;
                 if (userRole === "admin") {
                     q = collection(db, "receipt_history");
                 } else if (userRole === "buyer") {
                     q = query(collection(db, "receipt_history"), where("buyerId", "==", user.uid));
-                } else if (userRole === "seller") {
-                    q = query(collection(db, "receipt_history"), where("sellerId", "==", user.uid));
                 } else {
-                    console.log("No valid role found:", userRole);
                     setReceipts([]);
                     setLoading(false);
                     return;
                 }
                 const querySnapshot = await getDocs(q);
-                console.log("Query snapshot size:", querySnapshot.size);
                 const receiptsData = await Promise.all(querySnapshot.docs.map(async docSnapshot => {
                     const data = docSnapshot.data();
-                    console.log("Receipt data:", data);
-                    // If seller name is missing, try to fetch it from users collection
                     let sellerName = data.sellerName;
                     if (!sellerName && data.sellerId) {
                         try {
@@ -87,7 +86,7 @@ export default function ReceiptHistoryPage() {
                                 sellerName = sellerDoc.data().displayName || "Unknown Seller";
                             }
                         } catch (e) {
-                            console.error("Error fetching seller name:", e);
+                            setError("Error fetching seller information");
                         }
                     }
                     return {
@@ -99,11 +98,9 @@ export default function ReceiptHistoryPage() {
                         ...data
                     }
                 }));
-                console.log("Processed receipts data:", receiptsData);
                 receiptsData.sort((a, b) => b.buyingDate.getTime() - a.buyingDate.getTime())
                 setReceipts(receiptsData)
             } catch (error) {
-                console.error("Error fetching receipts:", error);
                 setError(error instanceof Error ? error.message : "Failed to fetch receipts")
             } finally {
                 setLoading(false)
@@ -124,7 +121,6 @@ export default function ReceiptHistoryPage() {
 
     const handleExportPDF = () => {
         if (selectedReceipt) {
-            // Remove fields not needed by the PDF generator if necessary
             generateReceiptPDF(selectedReceipt as any)
         }
     }
@@ -196,7 +192,6 @@ export default function ReceiptHistoryPage() {
                     </Table>
                 </CardContent>
             </Card>
-            {/* Modal for receipt details */}
             {showModal && selectedReceipt && (
                 <Dialog open={showModal} onOpenChange={handleCloseModal}>
                     <DialogContent className="max-w-[210mm] w-[210mm] p-8">
@@ -204,13 +199,11 @@ export default function ReceiptHistoryPage() {
                             <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-6">
-                            {/* Header */}
                             <div className="text-center">
                                 <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
                                 <p className="text-sm text-muted-foreground">Order Receipt</p>
                                 <p className="text-sm text-muted-foreground">{format(new Date(), 'PPP')}</p>
                             </div>
-                            {/* Order Details */}
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -225,7 +218,6 @@ export default function ReceiptHistoryPage() {
                                         <p className="text-sm capitalize">{selectedReceipt.paymentMethod}</p>
                                     </div>
                                 </div>
-                                {/* Product Details */}
                                 <div className="border-t pt-4">
                                     <h3 className="font-medium mb-2">Product Details</h3>
                                     <div className="flex items-center gap-4">
@@ -243,7 +235,6 @@ export default function ReceiptHistoryPage() {
                                         </div>
                                     </div>
                                 </div>
-                                {/* Price Breakdown */}
                                 <div className="border-t pt-4">
                                     <h3 className="font-medium mb-2">Price Breakdown</h3>
                                     <div className="space-y-2">

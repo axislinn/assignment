@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -48,19 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user) {
         // Set up presence tracking
         setupPresence(user.uid)
-        
+
         // Fetch user role from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid))
-          if (userDoc.exists() && userDoc.data().role) {
-            setUserRole(userDoc.data().role as UserRole)
-          } else {
-            setUserRole(null)
-          }
-        } catch (error) {
-          console.error("Error fetching user role:", error)
-          setUserRole(null)
-        }
+        await fetchUserRole(user.uid)
       } else {
         setUserRole(null)
       }
@@ -70,6 +61,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribe()
   }, [])
+
+  const fetchUserRole = async (uid: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", uid))
+      if (userDoc.exists()) {
+        setUserRole(userDoc.data().role)
+      }
+    } catch (error) {
+      setError("Failed to fetch user role")
+    }
+  }
 
   const signUp = async (email: string, password: string, role: UserRole, displayName?: string) => {
     try {
@@ -99,73 +101,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log("Attempting to sign in with email:", email)
+      setLoading(true)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
-      console.log("Successfully authenticated user:", user.uid)
-
-      // Fetch user role from Firestore
-      console.log("Fetching user role from Firestore...")
       const userDoc = await getDoc(doc(db, "users", user.uid))
-      if (userDoc.exists() && userDoc.data().role) {
-        const userData = userDoc.data()
-        console.log("User role found:", userData.role)
-        setUserRole(userData.role as UserRole)
-      } else {
-        setUserRole(null)
+      if (userDoc.exists()) {
+        setUserRole(userDoc.data().role)
       }
-    } catch (error: any) {
-      console.error("Detailed sign-in error:", {
-        code: error.code,
-        message: error.message,
-        email: email,
-        timestamp: new Date().toISOString()
-      })
-      
-      // Provide more user-friendly error messages
-      if (error.code === 'auth/invalid-credential') {
-        throw new Error("Invalid email or password. Please check your credentials and try again.")
-      } else if (error.code === 'auth/user-disabled') {
-        throw new Error("This account has been disabled. Please contact support.")
-      } else if (error.code === 'auth/user-not-found') {
-        throw new Error("No account found with this email. Please check your email or register.")
-      } else if (error.code === 'auth/too-many-requests') {
-        throw new Error("Too many failed login attempts. Please try again later.")
-      } else {
-        throw new Error(error.message || "An error occurred during sign in. Please try again.")
-      }
+      setUser(user)
+    } catch (error) {
+      setError("Failed to sign in")
+    } finally {
+      setLoading(false)
     }
   }
 
   const signInWithGoogle = async () => {
     try {
-      const provider = new GoogleAuthProvider()
-      const userCredential = await signInWithPopup(auth, provider)
-      const user = userCredential.user
-
-      // Check if user exists in Firestore
+      setLoading(true)
+      const result = await signInWithPopup(auth, new GoogleAuthProvider())
+      const user = result.user
       const userDoc = await getDoc(doc(db, "users", user.uid))
-
-      if (userDoc.exists() && userDoc.data().role) {
-        // Use the existing role from Firestore
-        const userData = userDoc.data()
-        setUserRole(userData.role as UserRole)
-      } else if (!userDoc.exists()) {
-        // Create new user document with default role as null (or you can prompt for role selection)
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          createdAt: new Date().toISOString(),
-          approved: true,
-        })
-        setUserRole(null)
-      } else {
-        setUserRole(null)
+      if (userDoc.exists()) {
+        setUserRole(userDoc.data().role)
       }
+      setUser(user)
     } catch (error) {
-      console.error("Error signing in with Google:", error)
-      throw error
+      setError("Failed to sign in with Google")
+    } finally {
+      setLoading(false)
     }
   }
 

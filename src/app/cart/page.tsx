@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { AuthProvider } from "@/lib/auth-context"
-import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore"
+import { addDoc, collection, serverTimestamp, doc, getDoc, getDocs, query, where, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import {
   AlertDialog,
@@ -31,6 +31,7 @@ import { generateReceiptPDF } from '@/lib/utils/pdf-generator'
 import { createNotification } from "@/lib/firebase/notifications"
 
 interface CartItem {
+  id: string
   productId: string
   title: string
   price: number
@@ -38,6 +39,8 @@ interface CartItem {
   quantity: number
   maxQuantity: number
   sellerId: string
+  buyerId: string
+  createdAt: any
 }
 
 const PAYMENT_METHODS = [
@@ -60,9 +63,9 @@ function CartContent() {
   const { user, loading: authLoading, userRole } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const [cartItem, setCartItem] = useState<CartItem | null>(null)
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('')
   const [showPaymentError, setShowPaymentError] = useState(false)
@@ -71,31 +74,85 @@ function CartContent() {
   const [pendingReceipt, setPendingReceipt] = useState<any>(null)
 
   useEffect(() => {
-    // Get cart item from sessionStorage
-    const storedItem = sessionStorage.getItem('cartItem')
-    if (storedItem) {
-      setCartItem(JSON.parse(storedItem))
-      // Clear the stored item after reading
-      sessionStorage.removeItem('cartItem')
+    const fetchCartItems = async () => {
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const cartsQuery = query(
+          collection(db, "carts"),
+          where("buyerId", "==", user.uid)
+        )
+        const querySnapshot = await getDocs(cartsQuery)
+        const items = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CartItem[]
+        setCartItems(items)
+      } catch (error) {
+        console.error("Error fetching cart items:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load cart items. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [])
 
-  const handleUpdateQuantity = (newQuantity: number) => {
-    if (!cartItem) return
+    fetchCartItems()
+  }, [user, toast])
 
-    // Ensure quantity is within limits
-    const quantity = Math.max(1, Math.min(newQuantity, cartItem.maxQuantity))
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    try {
+      const item = cartItems.find(item => item.id === itemId)
+      if (!item) return
 
-    setCartItem(prev => prev ? { ...prev, quantity } : null)
+      // Ensure quantity is within limits
+      const quantity = Math.max(1, Math.min(newQuantity, item.maxQuantity))
+
+      // Update in Firestore
+      await updateDoc(doc(db, "carts", itemId), {
+        quantity
+      })
+
+      // Update local state
+      setCartItems(prev => prev.map(item =>
+        item.id === itemId ? { ...item, quantity } : item
+      ))
+    } catch (error) {
+      console.error("Error updating quantity:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update quantity",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleRemoveItem = () => {
-    setCartItem(null)
-    setShowDeleteDialog(false)
-    toast({
-      title: "Item removed",
-      description: "Item has been removed from your cart",
-    })
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      // Remove from Firestore
+      await deleteDoc(doc(db, "carts", itemId))
+
+      // Update local state
+      setCartItems(prev => prev.filter(item => item.id !== itemId))
+
+      toast({
+        title: "Item removed",
+        description: "Item has been removed from your cart",
+      })
+    } catch (error) {
+      console.error("Error removing item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove item",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleCheckout = async () => {
@@ -113,129 +170,134 @@ function CartContent() {
       return
     }
 
-    if (!cartItem) {
+    if (cartItems.length === 0) {
       toast({ title: "Error", description: "No items in cart", variant: "destructive" })
       return
     }
+
     if (!selectedPaymentMethod) {
       setShowPaymentError(true)
-      toast({ title: "Payment Method Required", description: "Please select a payment method to proceed with checkout", variant: "destructive" })
-      return
-    }
-    setShowPaymentError(false)
-
-    // Fetch seller name before showing modal
-    let sellerNameFetched = "Unknown Seller"
-    try {
-      const sellerDoc = await getDoc(doc(db, "users", cartItem.sellerId))
-      if (sellerDoc.exists()) {
-        sellerNameFetched = sellerDoc.data().displayName || "Unknown Seller"
-      }
-    } catch (e) {
-      console.error("Error fetching seller name:", e)
-    }
-    // Instead of showing receipt modal, go straight to confirm order
-    setPendingReceipt({
-      ...cartItem,
-      sellerName: sellerNameFetched,
-      paymentMethod: selectedPaymentMethod,
-      subtotal: cartItem.price * cartItem.quantity,
-      shipping: 5.99,
-      tax: (cartItem.price * cartItem.quantity) * 0.08,
-      total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-    });
-    await handleConfirmOrder({
-      sellerName: sellerNameFetched,
-      paymentMethod: selectedPaymentMethod
-    });
-  }
-
-  const handleConfirmOrder = async (options?: { sellerName?: string, paymentMethod?: string }) => {
-    if (!user || !cartItem) {
       toast({
-        title: "Error",
-        description: "Missing user or cart data",
-        variant: "destructive",
+        title: "Payment Method Required",
+        description: "Please select a payment method to proceed with checkout",
+        variant: "destructive"
       })
       return
     }
+
+    setShowPaymentError(false)
     setProcessing(true)
+
     try {
-      // Create the order in Firestore with confirmed status
-      const orderData = {
-        buyerId: user.uid,
-        buyerName: user.displayName || "Anonymous",
-        sellerId: cartItem.sellerId,
-        sellerName: options?.sellerName || "Unknown Seller",
-        productId: cartItem.productId,
-        productTitle: cartItem.title,
-        productImage: cartItem.image,
-        quantity: cartItem.quantity,
-        price: cartItem.price,
-        total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-        status: "confirmed", // Changed from "pending" to "confirmed"
-        createdAt: new Date().toISOString(),
-        paymentMethod: options?.paymentMethod || selectedPaymentMethod,
+      // Group cart items by sellerId
+      const itemsBySeller = cartItems.reduce((acc, item) => {
+        if (!acc[item.sellerId]) acc[item.sellerId] = [];
+        acc[item.sellerId].push(item);
+        return acc;
+      }, {} as Record<string, CartItem[]>);
+
+      // Process each cart item (for orders, receipts, and buyer notifications)
+      for (const item of cartItems) {
+        try {
+          // Get seller information
+          const sellerDocRef = await getDoc(doc(db, "users", item.sellerId))
+          if (!sellerDocRef.exists()) {
+            throw new Error(`Seller not found for ID: ${item.sellerId}`)
+          }
+          const sellerInfo = sellerDocRef.data()
+
+          // Create order
+          const orderData = {
+            buyerId: user.uid,
+            buyerName: user.displayName || "Anonymous",
+            sellerId: item.sellerId,
+            productId: item.productId,
+            productTitle: item.title,
+            productImage: item.image,
+            quantity: item.quantity,
+            price: item.price,
+            total: (item.price * item.quantity) + 5.99 + ((item.price * item.quantity) * 0.08),
+            status: "confirmed",
+            createdAt: new Date().toISOString(),
+            paymentMethod: selectedPaymentMethod,
+          }
+          const orderRef = await addDoc(collection(db, "orders"), orderData)
+
+          // Create receipt
+          const receiptData = {
+            orderId: orderRef.id,
+            buyerId: user.uid,
+            buyerName: user.displayName || "Anonymous",
+            sellerId: item.sellerId,
+            sellerName: sellerInfo.displayName || "Anonymous",
+            productId: item.productId,
+            productTitle: item.title,
+            productImage: item.image,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity,
+            shipping: 5.99,
+            tax: (item.price * item.quantity) * 0.08,
+            total: (item.price * item.quantity) + 5.99 + ((item.price * item.quantity) * 0.08),
+            paymentMethod: selectedPaymentMethod,
+            status: "completed" as "completed" | "pending" | "cancelled"
+          }
+          await createReceipt(receiptData)
+
+          // Notify buyer (per product)
+          await createNotification({
+            userId: user.uid,
+            type: "order_status",
+            title: "Order Confirmed",
+            message: `Your order for ${item.title} has been confirmed. Click to view receipt.`,
+            read: false,
+            orderId: orderRef.id,
+            productId: item.productId,
+            link: `/orders/${orderRef.id}`
+          })
+
+          // Remove item from cart
+          await deleteDoc(doc(db, "carts", item.id))
+        } catch (itemError) {
+          toast({
+            title: "Error",
+            description: `Failed to process item: ${item.title}. Please try again.`,
+            variant: "destructive",
+          })
+          throw itemError
+        }
       }
-      const orderRef = await addDoc(collection(db, "orders"), orderData)
 
-      // Create receipt immediately
-      await createReceipt({
-        orderId: orderRef.id,
-        buyerId: user.uid,
-        buyerName: user.displayName || "Anonymous",
-        sellerId: cartItem.sellerId,
-        sellerName: options?.sellerName || "Unknown Seller",
-        productId: cartItem.productId,
-        productTitle: cartItem.title,
-        productImage: cartItem.image,
-        quantity: cartItem.quantity,
-        price: cartItem.price,
-        subtotal: cartItem.price * cartItem.quantity,
-        shipping: 5.99,
-        tax: (cartItem.price * cartItem.quantity) * 0.08,
-        total: (cartItem.price * cartItem.quantity) + 5.99 + ((cartItem.price * cartItem.quantity) * 0.08),
-        paymentMethod: options?.paymentMethod || selectedPaymentMethod,
-        status: "completed"
-      })
-
-      // Notify the seller
-      await createNotification({
-        userId: cartItem.sellerId,
-        type: "order_status",
-        title: "New Confirmed Order",
-        message: `You have received a new confirmed order for ${cartItem.title} from ${user.displayName || "Anonymous"}`,
-        read: false,
-        orderId: orderRef.id,
-        productId: cartItem.productId,
-      })
-
-      // Notify the buyer
-      await createNotification({
-        userId: user.uid,
-        type: "order_status",
-        title: "Order Confirmed",
-        message: `Your order for ${cartItem.title} has been confirmed. Click to view receipt.`,
-        read: false,
-        orderId: orderRef.id,
-        productId: cartItem.productId,
-        link: `/orders/${orderRef.id}`
-      });
+      // Notify each seller once with all their products
+      for (const [sellerId, items] of Object.entries(itemsBySeller)) {
+        const productTitles = items.map(i => i.title).join(', ');
+        // Find the first orderId for this seller from the processed items
+        const firstOrderId = items[0]?.orderId || undefined;
+        const notificationData = {
+          userId: sellerId,
+          type: "order_status" as "order_status",
+          orderId: firstOrderId || "testOrderId",
+          title: "New Order Received",
+          message: `You have received a new order for: ${productTitles}`,
+          read: false
+        };
+        console.log("Notification data being sent:", notificationData);
+        await createNotification(notificationData);
+      }
 
       toast({
         title: "Order Confirmed",
         description: "Your order has been confirmed and the receipt is ready.",
         variant: "success",
       })
-      setShowReceipt(false)
-      setShowExportDialog(false)
-      setCartItem(null)
+
+      // Clear cart items from state
+      setCartItems([])
       router.push('/products')
-    } catch (error) {
-      console.error("Error creating order:", error)
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create order. Please try again.",
+        description: `Failed to process checkout: ${error.message}`,
         variant: "destructive",
       })
     } finally {
@@ -245,16 +307,15 @@ function CartContent() {
 
   const handleExportReceipt = () => {
     if (!pendingReceipt) return
-    console.log('pendingReceipt for PDF:', pendingReceipt)
     generateReceiptPDF(pendingReceipt)
     setShowExportDialog(false)
-    setCartItem(null)
+    setCartItems([])
     router.push('/products')
   }
 
   const handleSkipExport = () => {
     setShowExportDialog(false)
-    setCartItem(null)
+    setCartItems([])
     router.push('/products')
   }
 
@@ -263,12 +324,12 @@ function CartContent() {
   }
 
   // Calculate totals
-  const subtotal = cartItem ? cartItem.price * cartItem.quantity : 0
-  const shipping = cartItem ? 5.99 : 0
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const shipping = cartItems.length > 0 ? 5.99 : 0
   const tax = subtotal * 0.08
   const total = subtotal + shipping + tax
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center">
@@ -278,7 +339,25 @@ function CartContent() {
     )
   }
 
-  if (!cartItem) {
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <h2 className="mb-2 text-xl font-semibold">Please log in</h2>
+            <p className="mb-4 text-center text-muted-foreground">
+              You need to be logged in to view your cart.
+            </p>
+            <Button onClick={() => router.push('/auth/login')}>
+              Log In
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (cartItems.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="mb-6 text-3xl font-bold">Your Cart</h1>
@@ -303,63 +382,64 @@ function CartContent() {
       <h1 className="mb-6 text-3xl font-bold">Your Cart</h1>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="md:col-span-2">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <img
-                  src={cartItem.image}
-                  alt={cartItem.title}
-                  className="h-24 w-24 rounded-md object-cover"
-                  onError={(e) => {
-                    console.error(`Failed to load cart item image: ${cartItem.image}`);
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/default-product.png';
-                  }}
-                />
-                <div className="flex-1">
-                  <h3 className="font-medium">{cartItem.title}</h3>
-                  <p className="text-lg font-bold text-primary">${cartItem.price.toFixed(2)}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleUpdateQuantity(cartItem.quantity - 1)}
-                      disabled={cartItem.quantity <= 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      max={cartItem.maxQuantity}
-                      value={cartItem.quantity}
-                      onChange={(e) => handleUpdateQuantity(Number(e.target.value))}
-                      className="h-8 w-16 text-center"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleUpdateQuantity(cartItem.quantity + 1)}
-                      disabled={cartItem.quantity >= cartItem.maxQuantity}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="ml-auto h-8 w-8 text-destructive"
-                      onClick={() => setShowDeleteDialog(true)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+        <div className="md:col-span-2 space-y-4">
+          {cartItems.map((item) => (
+            <Card key={item.id}>
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="h-24 w-24 rounded-md object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/default-product.png';
+                    }}
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-medium">{item.title}</h3>
+                    <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={item.maxQuantity}
+                        value={item.quantity}
+                        onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
+                        className="h-8 w-16 text-center"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                        disabled={item.quantity >= item.maxQuantity}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-auto h-8 w-8 text-destructive"
+                        onClick={() => handleRemoveItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         <div>
@@ -413,7 +493,6 @@ function CartContent() {
                         alt={method.name}
                         className="h-8 w-8 object-contain"
                         onError={(e) => {
-                          console.error(`Failed to load image: ${method.icon}`);
                           const target = e.target as HTMLImageElement;
                           target.src = '/default-payment.png';
                         }}
@@ -428,7 +507,7 @@ function CartContent() {
               <Button
                 className="w-full"
                 onClick={handleCheckout}
-                disabled={processing || !cartItem}
+                disabled={processing || cartItems.length === 0}
               >
                 {processing ? "Processing..." : "Proceed to Checkout"}
               </Button>
@@ -437,27 +516,10 @@ function CartContent() {
         </div>
       </div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Item</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove this item from your cart?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <ReceiptVoucher
         isOpen={showReceipt}
         onClose={() => setShowReceipt(false)}
-        onConfirm={handleConfirmOrder}
+        onConfirm={handleCheckout}
         onCancel={handleCancelOrder}
         orderData={pendingReceipt}
       />
@@ -466,7 +528,7 @@ function CartContent() {
         isOpen={showExportDialog}
         onClose={() => {
           setShowExportDialog(false)
-          setCartItem(null)
+          setCartItems([])
           router.push('/products')
         }}
         onExport={handleExportReceipt}

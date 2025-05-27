@@ -37,6 +37,7 @@ export function NotificationsTab() {
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [clickedNotificationId, setClickedNotificationId] = useState<string | null>(null)
   const [actionedNotificationId, setActionedNotificationId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -180,9 +181,9 @@ export function NotificationsTab() {
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
           const receiptData = snapshot.docs[0].data();
-          const receipt = { 
+          const receipt = {
             id: snapshot.docs[0].id,
-            ...receiptData 
+            ...receiptData
           } as unknown as ReceiptHistory;
           setSelectedReceipt(receipt);
           setShowReceiptModal(true);
@@ -194,7 +195,7 @@ export function NotificationsTab() {
           });
         }
       } catch (err) {
-        console.error("[DEBUG] Error during receipt query:", err);
+        setError("Failed to fetch receipt information");
       }
     }
   };

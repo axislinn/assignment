@@ -46,12 +46,11 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
       icon: MessageSquare,
       roles: ["admin", "seller", "buyer"],
     },
-
     {
       title: "Receipt History",
       href: "/dashboard/receipt-history",
       icon: Receipt,
-      roles: ["admin", "seller", "buyer"],
+      roles: ["admin", "buyer"],
     },
     {
       title: "Users",
@@ -79,30 +78,39 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
     }
   ]
 
-  // Filter items based on user role
-  const filteredNavItems = navItems.filter((item) =>
-    userRole ? item.roles.includes(userRole) : false
-  )
+  const isActive = (path: string) => {
+    return pathname === path;
+  };
+
+  const shouldShowItem = (item: NavItem) => {
+    if (!item.roles) return true;
+    return item.roles.includes(userRole as string);
+  };
 
   return (
     <ScrollArea className="h-full py-6">
       <div className={cn("flex flex-col gap-2 px-2", className)} {...props}>
-        {filteredNavItems.map((item) => (
-          <Button
-            key={item.href}
-            variant={pathname === item.href ? "default" : "ghost"}
-            className={cn(
-              "justify-start",
-              pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-            )}
-            asChild
-          >
-            <Link href={item.href}>
-              <item.icon className="mr-2 h-4 w-4" />
-              {item.title}
-            </Link>
-          </Button>
-        ))}
+        {navItems.map((item) => {
+          const include = shouldShowItem(item);
+          if (!include) return null;
+
+          return (
+            <Button
+              key={item.href}
+              variant={pathname === item.href ? "default" : "ghost"}
+              className={cn(
+                "justify-start",
+                pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              )}
+              asChild
+            >
+              <Link href={item.href}>
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.title}
+              </Link>
+            </Button>
+          );
+        })}
       </div>
     </ScrollArea>
   )

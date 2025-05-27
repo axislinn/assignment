@@ -140,7 +140,7 @@ export default function ProductDetailPage() {
       setInWishlist(wasAdded)
       toast({
         title: wasAdded ? "Added to wishlist" : "Removed from wishlist",
-        description: wasAdded 
+        description: wasAdded
           ? `${product?.title} has been added to your wishlist`
           : `${product?.title} has been removed from your wishlist`,
       })
@@ -275,25 +275,72 @@ export default function ProductDetailPage() {
     }
   }
 
-  const handleAddToCart = () => {
-    if (!product) return
-    
-    // Create cart item data
-    const cartItem = {
-      productId: product.id,
-      title: product.title,
-      price: product.price,
-      image: product.images?.[0] || "",
-      quantity: 1,
-      maxQuantity: product.inStockQuantity,
-      sellerId: product.sellerId
+  const handleAddToCart = async () => {
+    if (!product || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please login to add items to your cart",
+        variant: "destructive",
+      })
+      router.push("/auth/login")
+      return
     }
 
-    // Store in sessionStorage temporarily
-    sessionStorage.setItem('cartItem', JSON.stringify(cartItem))
-    
-    // Redirect to cart page
-    router.push('/')
+    try {
+      // Check if item already exists in cart
+      const cartsQuery = query(
+        collection(db, "carts"),
+        where("buyerId", "==", user.uid),
+        where("productId", "==", product.id)
+      )
+      const querySnapshot = await getDocs(cartsQuery)
+
+      if (!querySnapshot.empty) {
+        // Item exists, update quantity
+        const cartDoc = querySnapshot.docs[0]
+        const currentQuantity = cartDoc.data().quantity
+        const newQuantity = Math.min(currentQuantity + 1, product.inStockQuantity)
+
+        await updateDoc(doc(db, "carts", cartDoc.id), {
+          quantity: newQuantity
+        })
+
+        toast({
+          title: "Cart Updated",
+          description: `Quantity updated for ${product.title}`,
+        })
+      } else {
+        // Item doesn't exist, create new cart item
+        const cartItem = {
+          productId: product.id,
+          title: product.title,
+          price: product.price,
+          image: product.images?.[0] || "",
+          quantity: 1,
+          maxQuantity: product.inStockQuantity,
+          sellerId: product.sellerId,
+          buyerId: user.uid,
+          createdAt: serverTimestamp()
+        }
+
+        await addDoc(collection(db, "carts"), cartItem)
+
+        toast({
+          title: "Added to cart",
+          description: `${product.title} has been added to your cart`,
+        })
+      }
+
+      // Redirect to cart page
+      router.push('/')
+    } catch (error) {
+      console.error("Error adding to cart:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -402,8 +449,8 @@ export default function ProductDetailPage() {
               <Heart className={`mr-2 h-4 w-4 ${inWishlist ? "fill-red-500 text-red-500" : ""}`} />
               {inWishlist ? "Saved" : "Save"}
             </Button>
-            <Button 
-              className="flex-1" 
+            <Button
+              className="flex-1"
               onClick={handleAddToCart}
               disabled={product.inStockQuantity <= 0}
             >

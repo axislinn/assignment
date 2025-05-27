@@ -28,67 +28,37 @@ function RecentSales() {
   const [isIndexBuilding, setIsIndexBuilding] = useState(false)
 
   useEffect(() => {
-    if (!user) {
-      console.log("No user found")
-      return
-    }
-
     const fetchRecentOrders = async () => {
+      if (!user) {
+        setRecentOrders([]);
+        return;
+      }
+
       try {
-        console.log("Fetching orders for seller:", user.uid)
-        
-        const confirmedOrdersQuery = query(
+        const q = query(
           collection(db, "orders"),
           where("sellerId", "==", user.uid),
-          where("status", "in", ["confirmed", "Confirmed", "CONFIRMED"]),
+          where("status", "==", "confirmed"),
           orderBy("createdAt", "desc"),
           limit(5)
-        )
-        
-        try {
-          const confirmedSnapshot = await getDocs(confirmedOrdersQuery)
-          console.log("Confirmed orders found:", confirmedSnapshot.size)
-          
-          const orders = confirmedSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Order[]
-          
-          setRecentOrders(orders)
-          setError(null)
-          setIsIndexBuilding(false)
-        } catch (queryError: any) {
-          if (queryError?.message?.includes("requires an index")) {
-            console.log("Index required, setting building state")
-            setIsIndexBuilding(true)
-            setError("Creating database index...")
-          } else {
-            throw queryError
-          }
-        }
+        );
+
+        const confirmedSnapshot = await getDocs(q);
+        const ordersData = confirmedSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setRecentOrders(ordersData);
       } catch (error) {
-        console.error("Error fetching recent orders:", error)
-        setError(error instanceof Error ? error.message : "Failed to fetch orders")
-        setIsIndexBuilding(false)
+        setError("Failed to fetch recent orders");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchRecentOrders()
-
-    // Retry if index is building
-    let retryInterval: NodeJS.Timeout
-    if (isIndexBuilding) {
-      retryInterval = setInterval(fetchRecentOrders, 5000) // Retry every 5 seconds
-    }
-
-    return () => {
-      if (retryInterval) {
-        clearInterval(retryInterval)
-      }
-    }
-  }, [user, isIndexBuilding])
+    fetchRecentOrders();
+  }, [user]);
 
   if (loading) {
     return (
@@ -98,19 +68,7 @@ function RecentSales() {
     )
   }
 
-  if (isIndexBuilding) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[200px] space-y-4 text-center">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Setting up the database...</span>
-        </div>
-        <p className="text-sm text-muted-foreground">This may take a few minutes. The page will automatically refresh when ready.</p>
-      </div>
-    )
-  }
-
-  if (error && !isIndexBuilding) {
+  if (error) {
     return (
       <div className="flex justify-center items-center h-[200px] text-destructive">
         <p>{error}</p>

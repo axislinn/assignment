@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useEffect } from "react"
 
 interface ExportReceiptDialogProps {
   isOpen: boolean
@@ -21,10 +20,6 @@ export function ExportReceiptDialog({
   onExport,
   onSkip,
 }: ExportReceiptDialogProps) {
-  useEffect(() => {
-    console.log('ExportReceiptDialog mounted, isOpen:', isOpen)
-  }, [isOpen])
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
