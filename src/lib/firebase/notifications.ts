@@ -45,7 +45,6 @@ export async function getUserNotifications(userId: string, limitCount = 50): Pro
       createdAt: doc.data().createdAt?.toDate() || new Date(),
     })) as Notification[]
   } catch (error) {
-    console.error("Error getting notifications:", error)
     return []
   }
 }
@@ -62,7 +61,6 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
     const querySnapshot = await getDocs(notificationsQuery)
     return querySnapshot.size
   } catch (error) {
-    console.error("Error getting unread notification count:", error)
     return 0
   }
 }
@@ -76,7 +74,6 @@ export async function markNotificationAsRead(notificationId: string): Promise<bo
 
     return true
   } catch (error) {
-    console.error("Error marking notification as read:", error)
     return false
   }
 }
@@ -101,7 +98,6 @@ export async function markAllNotificationsAsRead(userId: string): Promise<boolea
 
     return true
   } catch (error) {
-    console.error("Error marking all notifications as read:", error)
     return false
   }
 }
@@ -134,14 +130,12 @@ export async function createNotification(notification: Omit<Notification, "id" |
             },
           })
         } catch (error) {
-          console.error("Error sending push notification:", error)
         }
       }
     }
 
     return notificationRef.id
   } catch (error) {
-    console.error("Error creating notification:", error)
     throw error
   }
 }
@@ -152,7 +146,6 @@ export async function deleteNotification(notificationId: string): Promise<boolea
     await deleteDoc(doc(db, "notifications", notificationId))
     return true
   } catch (error) {
-    console.error("Error deleting notification:", error)
     return false
   }
 }
@@ -161,22 +154,6 @@ export async function deleteNotification(notificationId: string): Promise<boolea
 async function sendPushNotification(token: string, notification: { title: string; body: string; data?: any }) {
   // This would typically be done via a server-side function
   // For client-side, we'll use a placeholder implementation
-  console.log(`Sending push notification to token ${token}:`, notification)
-
-  // In a real implementation, you would call your backend API that uses Firebase Admin SDK
-  // Example server-side code:
-  /*
-  const message = {
-    notification: {
-      title: notification.title,
-      body: notification.body,
-    },
-    data: notification.data,
-    token: token,
-  }
-  
-  return admin.messaging().send(message)
-  */
 
   return true
 }

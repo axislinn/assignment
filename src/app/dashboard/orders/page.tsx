@@ -115,8 +115,6 @@ export default function DashboardOrdersPage() {
           ...doc.data(),
         })) as Order[]
 
-        console.log("Fetched ordersData:", ordersData);
-
         // Filter confirmed orders for buyers and admins
         if (userRole !== "seller") {
           ordersData = ordersData.filter(order => order.status === "confirmed")
@@ -150,13 +148,11 @@ export default function DashboardOrdersPage() {
             })
             .filter((order): order is Order => order !== null);
 
-          console.log("Filtered orders for seller:", filteredOrders);
           setOrders(filteredOrders)
         } else {
           setOrders(ordersData)
         }
       } catch (error) {
-        console.error("Error fetching orders:", error)
         toast({
           title: "Error",
           description: "Failed to load orders",
@@ -195,7 +191,6 @@ export default function DashboardOrdersPage() {
       setSelectedOrder(null)
       setIsDialogOpen(false)
     } catch (error) {
-      console.error("Error updating order status:", error)
       toast({
         title: "Error",
         description: "Failed to update order status",

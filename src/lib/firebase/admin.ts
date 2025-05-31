@@ -55,8 +55,6 @@ export async function getAdminStats() {
             if (sellerDoc.exists()) {
               sellerName = sellerDoc.data().displayName || sellerDoc.data().email?.split("@")[0] || "Unknown"
             }
-          } catch (error) {
-            console.error("Error fetching seller:", error)
           }
 
           return {
@@ -71,9 +69,6 @@ export async function getAdminStats() {
 
     const pendingApprovals = [...pendingSellerApprovals, ...pendingProductApprovals]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5)
-
-      // Get sales data (simplifie  - new Date(a.date).getTime())
       .slice(0, 5)
 
     // Get sales data (simplified for demo)
@@ -93,7 +88,6 @@ export async function getAdminStats() {
       pendingApprovals,
     }
   } catch (error) {
-    console.error("Error getting admin stats:", error)
     // Return default stats
     return {
       totalUsers: 0,
@@ -117,7 +111,6 @@ export async function approveSeller(userId: string) {
     })
     return true
   } catch (error) {
-    console.error("Error approving seller:", error)
     throw error
   }
 }
@@ -129,7 +122,6 @@ export async function approveProduct(productId: string) {
     })
     return true
   } catch (error) {
-    console.error("Error approving product:", error)
     throw error
   }
 }
@@ -161,7 +153,6 @@ export async function getUsers(options: { role?: string; approved?: boolean } = 
       createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt || new Date(),
     }))
   } catch (error) {
-    console.error("Error getting users:", error)
     return []
   }
 }

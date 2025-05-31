@@ -29,13 +29,6 @@ export async function uploadImageToSupabase(
     const fileName = `${uuidv4()}.${fileExt}`
     const filePath = `${folder}/${fileName}`
 
-    console.log('Attempting to upload file:', {
-      bucket,
-      filePath,
-      fileType: file.type,
-      fileSize: file.size
-    })
-
     // Upload file with metadata
     const { data: uploadData, error: uploadError } = await supabase
       .storage
@@ -47,21 +40,8 @@ export async function uploadImageToSupabase(
       })
 
     if (uploadError) {
-      console.error('Upload error details:', {
-        error: uploadError,
-        bucket,
-        filePath,
-        fileType: file.type,
-        fileSize: file.size
-      })
       throw new Error(`Error uploading image: ${uploadError.message}`)
     }
-
-    console.log('File uploaded successfully:', {
-      bucket,
-      filePath,
-      uploadData
-    })
 
     // Get public URL
     const { data: publicUrlData } = supabase
@@ -78,12 +58,6 @@ export async function uploadImageToSupabase(
       path: filePath
     }
   } catch (error: any) {
-    console.error('Upload failed:', {
-      error: error.message || error,
-      bucket,
-      fileType: file.type,
-      fileSize: file.size
-    })
     throw error
   }
 }
@@ -93,35 +67,15 @@ export async function deleteImageFromSupabase(
   bucket: string = 'marketplace'
 ): Promise<void> {
   try {
-    console.log('Attempting to delete file:', {
-      bucket,
-      path
-    })
-
     const { error } = await supabase
       .storage
       .from(bucket)
       .remove([path])
 
     if (error) {
-      console.error('Delete error details:', {
-        error,
-        bucket,
-        path
-      })
       throw new Error(`Error deleting image: ${error.message}`)
     }
-
-    console.log('File deleted successfully:', {
-      bucket,
-      path
-    })
   } catch (error: any) {
-    console.error('Delete failed:', {
-      error: error.message || error,
-      bucket,
-      path
-    })
     throw error
   }
 }
@@ -132,33 +86,14 @@ export async function uploadMultipleImages(
   folder: string = 'product-images'
 ): Promise<UploadResult[]> {
   try {
-    console.log('Attempting to upload multiple files:', {
-      bucket,
-      folder,
-      fileCount: files.length
-    })
-
-    const uploadPromises = files.map(file => 
+    const uploadPromises = files.map(file =>
       uploadImageToSupabase(file, bucket, folder)
     )
-    
+
     const results = await Promise.all(uploadPromises)
-    
-    console.log('Multiple files uploaded successfully:', {
-      bucket,
-      folder,
-      fileCount: files.length,
-      results
-    })
 
     return results
   } catch (error: any) {
-    console.error('Multiple upload failed:', {
-      error: error.message || error,
-      bucket,
-      folder,
-      fileCount: files.length
-    })
     throw error
   }
 } 

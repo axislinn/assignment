@@ -44,7 +44,7 @@ export async function getChats(userId: string) {
               }
             }
           } catch (error) {
-            console.error("Error fetching other user:", error)
+            // Removed console.error("Error fetching other user:", error)
           }
         }
 
@@ -53,13 +53,13 @@ export async function getChats(userId: string) {
           ...chatData,
           lastMessage: chatData.lastMessage
             ? {
-                ...chatData.lastMessage,
-                timestamp: chatData.lastMessage.timestamp?.toDate() || new Date(),
-              }
+              ...chatData.lastMessage,
+              timestamp: chatData.lastMessage.timestamp?.toDate() || new Date(),
+            }
             : {
-                text: "No messages yet",
-                timestamp: new Date(),
-              },
+              text: "No messages yet",
+              timestamp: new Date(),
+            },
           otherUser: otherUser || {
             id: otherUserId || "unknown",
             displayName: "Unknown User",
@@ -72,7 +72,7 @@ export async function getChats(userId: string) {
     // Sort chats by last message timestamp
     return chats.sort((a, b) => b.lastMessage.timestamp.getTime() - a.lastMessage.timestamp.getTime())
   } catch (error) {
-    console.error("Error getting chats:", error)
+    // Removed console.error("Error getting chats:", error)
     return []
   }
 }
@@ -89,7 +89,7 @@ export async function getMessages(chatId: string) {
       timestamp: doc.data().timestamp?.toDate() || new Date(),
     }))
   } catch (error) {
-    console.error("Error getting messages:", error)
+    // Removed console.error("Error getting messages:", error)
     return []
   }
 }
@@ -112,7 +112,7 @@ export async function sendMessage(chatId: string, message: { text: string; sende
 
     return true
   } catch (error) {
-    console.error("Error sending message:", error)
+    // Removed console.error("Error sending message:", error)
     throw error
   }
 }
@@ -125,9 +125,9 @@ export async function createChat(participants: string[], initialMessage?: { text
       createdAt: serverTimestamp(),
       lastMessage: initialMessage
         ? {
-            text: initialMessage.text,
-            timestamp: serverTimestamp(),
-          }
+          text: initialMessage.text,
+          timestamp: serverTimestamp(),
+        }
         : null,
     }
 
@@ -143,7 +143,7 @@ export async function createChat(participants: string[], initialMessage?: { text
 
     return chatRef.id
   } catch (error) {
-    console.error("Error creating chat:", error)
+    // Removed console.error("Error creating chat:", error)
     throw error
   }
 }

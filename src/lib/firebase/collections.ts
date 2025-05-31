@@ -40,7 +40,6 @@ export const createReceipt = async (receiptData: Omit<ReceiptHistory, 'createdAt
     const docRef = await addDoc(collection(db, 'receipt_history'), receiptWithTimestamps)
     return docRef.id
   } catch (error) {
-    console.error('Error creating receipt:', error)
     throw error
   }
 } 

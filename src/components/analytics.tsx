@@ -14,8 +14,6 @@ export function Analytics() {
       // window.gtag('config', 'GA_MEASUREMENT_ID', {
       //   page_path: pathname + searchParams.toString(),
       // })
-
-      console.log(`Page view: ${pathname}${searchParams.toString()}`)
     }
   }, [pathname, searchParams])
 
