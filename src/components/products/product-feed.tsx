@@ -79,10 +79,10 @@ function ProductFeedContent() {
         // Filter by search query if present
         const filteredProducts = searchQuery
           ? productsData.filter(
-              (product) =>
-                product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.description.toLowerCase().includes(searchQuery.toLowerCase()),
-            )
+            (product) =>
+              product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              product.description.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
           : productsData
 
         setProducts(filteredProducts)
@@ -98,12 +98,12 @@ function ProductFeedContent() {
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <ProductFilters />
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {Array.from({ length: 8 }).map((_, index) => (
-            <div key={index} className="space-y-3">
-              <Skeleton className="h-[200px] w-full rounded-lg" />
+            <div key={index} className="space-y-2 sm:space-y-3">
+              <Skeleton className="h-[180px] sm:h-[200px] w-full rounded-lg" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
             </div>
@@ -114,20 +114,20 @@ function ProductFeedContent() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <ProductFilters />
       {products.length === 0 ? (
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium">No products found</h3>
-          <p className="text-muted-foreground">Try adjusting your filters or search query</p>
+        <div className="text-center py-8 sm:py-12">
+          <h3 className="text-base sm:text-lg font-medium">No products found</h3>
+          <p className="text-sm sm:text-base text-muted-foreground">Try adjusting your filters or search query</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {products.map((product) => (
-            <ProductCard 
-              key={product.id} 
-              product={product} 
-              inWishlist={wishlistItems.some(item => item.id === product.id)} 
+            <ProductCard
+              key={product.id}
+              product={product}
+              inWishlist={wishlistItems.some(item => item.id === product.id)}
             />
           ))}
         </div>

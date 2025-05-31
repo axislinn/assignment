@@ -3,27 +3,27 @@ import Link from "next/link"
 
 export function HeroSection() {
   return (
-    <div className="relative py-12 md:py-16 lg:py-24 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl overflow-hidden mb-8 md:mb-12">
-      <div className="container mx-auto px-4">
+    <div className="relative py-8 sm:py-12 md:py-16 lg:py-24 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl overflow-hidden mb-6 sm:mb-8 md:mb-12">
+      <div className="container mx-auto px-4 sm:px-6">
         <div className="max-w-3xl">
           <h1
-            className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 dark:text-gray-50"
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 md:mb-6 dark:text-gray-50"
             style={{ color: "hsl(var(--secondary-foreground))" }}
           >
             Find Treasures, Create Stories
           </h1>
           <p
-            className="text-lg md:text-xl mb-6 md:mb-8 dark:text-gray-300"
+            className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 md:mb-8 dark:text-gray-300"
             style={{ color: "hsl(var(--secondary-foreground))" }}
           >
             Buy and sell pre-loved items in your community. Give items a second chance and make sustainable choices
             while saving money.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Button asChild size="lg" className="w-full sm:w-auto">
+            <Button asChild size="lg" className="w-full sm:w-auto text-sm sm:text-base">
               <Link href="/products">Browse Products</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+            <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-sm sm:text-base">
               <Link href="/sell">Sell an Item</Link>
             </Button>
           </div>

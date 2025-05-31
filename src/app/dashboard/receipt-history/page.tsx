@@ -146,73 +146,74 @@ export default function ReceiptHistoryPage() {
 
     return (
         <div className="space-y-4">
-            <h1 className="text-3xl font-bold">Receipt History</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Receipt History</h1>
             <Card>
                 <CardHeader>
                     <CardTitle>Recent Purchases</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Order ID</TableHead>
-                                <TableHead>Total Amount</TableHead>
-                                <TableHead>Purchase Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {receipts.map((receipt) => (
-                                <TableRow
-                                    key={receipt.id}
-                                    onClick={() => handleRowClick(receipt)}
-                                    className="cursor-pointer hover:bg-primary/10"
-                                >
-                                    <TableCell className="font-medium">
-                                        {receipt.orderId}
-                                    </TableCell>
-                                    <TableCell>
-                                        ${receipt.total?.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell>
-                                        {format(receipt.buyingDate, "MMM dd, yyyy HH:mm")}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {receipts.length === 0 && (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-4">
-                                        No purchase history found.
-                                    </TableCell>
+                                    <TableHead className="whitespace-nowrap">Order ID</TableHead>
+                                    <TableHead className="whitespace-nowrap">Total Amount</TableHead>
+                                    <TableHead className="whitespace-nowrap">Purchase Date</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {receipts.map((receipt) => (
+                                    <TableRow
+                                        key={receipt.id}
+                                        onClick={() => handleRowClick(receipt)}
+                                        className="cursor-pointer hover:bg-primary/10"
+                                    >
+                                        <TableCell className="font-medium whitespace-nowrap">
+                                            {receipt.orderId}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            ${receipt.total?.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {format(receipt.buyingDate, "MMM dd, yyyy HH:mm")}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {receipts.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-4">
+                                            No purchase history found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
             {showModal && selectedReceipt && (
                 <Dialog open={showModal} onOpenChange={handleCloseModal}>
-                    <DialogContent className="max-w-[210mm] w-[210mm] p-8 max-h-[90vh] flex flex-col">
+                    <DialogContent className="max-w-[95vw] sm:max-w-[210mm] w-full p-4 sm:p-8 max-h-[90vh] flex flex-col">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
+                            <DialogTitle className="text-xl sm:text-2xl font-bold text-center mb-4 sm:mb-6">Order Receipt</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-6 flex-1 overflow-y-auto">
+                        <div className="space-y-4 sm:space-y-6 flex-1 overflow-y-auto">
                             <div className="text-center">
-                                <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
-                                <p className="text-sm text-muted-foreground">Order Receipt</p>
-                                <p className="text-sm text-muted-foreground">{format(new Date(), 'PPP')}</p>
+                                <h2 className="text-lg sm:text-xl font-semibold">SecondChance Marketplace</h2>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Order Receipt</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">{format(new Date(), 'PPP')}</p>
                             </div>
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <h3 className="font-medium">Order Information</h3>
-                                        <p className="text-sm">Order ID: {selectedReceipt.orderId}</p>
-                                        <p className="text-sm">Date: {format(selectedReceipt.buyingDate || new Date(), 'PPP')}</p>
-                                        <p className="text-sm">Buyer: {selectedReceipt.buyerName}</p>
-                                        {/* <p className="text-sm">Seller: {selectedReceipt.sellerName}</p> */}
+                                        <p className="text-xs sm:text-sm">Order ID: {selectedReceipt.orderId}</p>
+                                        <p className="text-xs sm:text-sm">Date: {format(selectedReceipt.buyingDate || new Date(), 'PPP')}</p>
+                                        <p className="text-xs sm:text-sm">Buyer: {selectedReceipt.buyerName}</p>
                                     </div>
                                     <div>
                                         <h3 className="font-medium">Payment Method</h3>
-                                        <p className="text-sm capitalize">{selectedReceipt.paymentMethod}</p>
+                                        <p className="text-xs sm:text-sm capitalize">{selectedReceipt.paymentMethod}</p>
                                     </div>
                                 </div>
                                 <div className="border-t pt-4">
@@ -220,18 +221,18 @@ export default function ReceiptHistoryPage() {
                                     <div className="space-y-4">
                                         {selectedReceipt.products && selectedReceipt.products.length > 0 ? (
                                             selectedReceipt.products.map((product, idx) => (
-                                                <div key={idx} className="flex items-center gap-4">
+                                                <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                                     <img
                                                         src={product.productImage}
                                                         alt={product.productTitle}
-                                                        className="h-20 w-20 object-cover rounded"
+                                                        className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded"
                                                     />
                                                     <div>
-                                                        <p className="font-medium">{product.productTitle}</p>
-                                                        <p className="text-sm text-muted-foreground">Seller: {product.sellerName}</p>
-                                                        <p className="text-sm">Quantity: {product.quantity}</p>
-                                                        <p className="text-sm">Price: ${product.price.toFixed(2)}</p>
-                                                        <p className="text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
+                                                        <p className="font-medium text-sm sm:text-base">{product.productTitle}</p>
+                                                        <p className="text-xs sm:text-sm text-muted-foreground">Seller: {product.sellerName}</p>
+                                                        <p className="text-xs sm:text-sm">Quantity: {product.quantity}</p>
+                                                        <p className="text-xs sm:text-sm">Price: ${product.price.toFixed(2)}</p>
+                                                        <p className="text-xs sm:text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
                                                     </div>
                                                 </div>
                                             ))
@@ -243,19 +244,19 @@ export default function ReceiptHistoryPage() {
                                 <div className="border-t pt-4">
                                     <h3 className="font-medium mb-2">Price Breakdown</h3>
                                     <div className="space-y-2">
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between text-sm">
                                             <span>Subtotal</span>
                                             <span>${selectedReceipt.products?.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2)}</span>
                                         </div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between text-sm">
                                             <span>Shipping</span>
                                             <span>${selectedReceipt.shipping?.toFixed(2)}</span>
                                         </div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between text-sm">
                                             <span>Tax</span>
                                             <span>${selectedReceipt.tax?.toFixed(2)}</span>
                                         </div>
-                                        <div className="flex justify-between font-bold border-t pt-2">
+                                        <div className="flex justify-between font-bold border-t pt-2 text-sm">
                                             <span>Total</span>
                                             <span>${selectedReceipt.total?.toFixed(2)}</span>
                                         </div>
@@ -263,10 +264,10 @@ export default function ReceiptHistoryPage() {
                                 </div>
                             </div>
                         </div>
-                        <DialogFooter className="flex justify-center mt-6">
+                        <DialogFooter className="flex justify-center mt-4 sm:mt-6">
                             <Button
                                 onClick={handleExportPDF}
-                                className="w-32"
+                                className="w-full sm:w-32"
                             >
                                 Export to PDF
                             </Button>

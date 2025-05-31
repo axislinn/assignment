@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   keywords: ["marketplace", "secondhand", "used items", "buy and sell", "sustainable shopping"],
   authors: [{ name: "SecondChance Team" }],
   creator: "SecondChance Marketplace",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -54,7 +55,7 @@ export default function RootLayout({
           <AuthProvider>
             <div className="flex min-h-screen flex-col">
               <Header />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 w-full max-w-[100vw] overflow-x-hidden">{children}</main>
               <Footer />
               <Toaster />
             </div>
