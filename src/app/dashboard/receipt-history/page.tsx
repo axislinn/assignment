@@ -41,6 +41,15 @@ interface Receipt {
     total?: number
     paymentMethod?: string
     status?: string
+    products?: {
+        productImage: string
+        productTitle: string
+        quantity: number
+        price: number
+        subtotal: number
+        sellerId: string
+        sellerName: string
+    }[]
 }
 
 export default function ReceiptHistoryPage() {
@@ -78,23 +87,11 @@ export default function ReceiptHistoryPage() {
                 const querySnapshot = await getDocs(q);
                 const receiptsData = await Promise.all(querySnapshot.docs.map(async docSnapshot => {
                     const data = docSnapshot.data();
-                    let sellerName = data.sellerName;
-                    if (!sellerName && data.sellerId) {
-                        try {
-                            const sellerDoc = await getDoc(doc(db, "users", data.sellerId));
-                            if (sellerDoc.exists()) {
-                                sellerName = sellerDoc.data().displayName || "Unknown Seller";
-                            }
-                        } catch (e) {
-                            setError("Error fetching seller information");
-                        }
-                    }
                     return {
                         id: docSnapshot.id,
-                        name: data.productTitle ?? "No name",
-                        productPrice: data.price ?? 0,
+                        name: data.products?.[0]?.productTitle ?? "Multiple Products",
+                        productPrice: data.total ?? 0,
                         buyingDate: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-                        sellerName: sellerName || "Unknown Seller",
                         ...data
                     }
                 }));
@@ -158,8 +155,8 @@ export default function ReceiptHistoryPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Product Name</TableHead>
-                                <TableHead>Price</TableHead>
+                                <TableHead>Order ID</TableHead>
+                                <TableHead>Total Amount</TableHead>
                                 <TableHead>Purchase Date</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -171,10 +168,10 @@ export default function ReceiptHistoryPage() {
                                     className="cursor-pointer hover:bg-primary/10"
                                 >
                                     <TableCell className="font-medium">
-                                        {receipt.name}
+                                        {receipt.orderId}
                                     </TableCell>
                                     <TableCell>
-                                        ${receipt.productPrice.toFixed(2)}
+                                        ${receipt.total?.toFixed(2)}
                                     </TableCell>
                                     <TableCell>
                                         {format(receipt.buyingDate, "MMM dd, yyyy HH:mm")}
@@ -183,7 +180,7 @@ export default function ReceiptHistoryPage() {
                             ))}
                             {receipts.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center py-4">
+                                    <TableCell colSpan={4} className="text-center py-4">
                                         No purchase history found.
                                     </TableCell>
                                 </TableRow>
@@ -211,7 +208,7 @@ export default function ReceiptHistoryPage() {
                                         <p className="text-sm">Order ID: {selectedReceipt.orderId}</p>
                                         <p className="text-sm">Date: {format(selectedReceipt.buyingDate || new Date(), 'PPP')}</p>
                                         <p className="text-sm">Buyer: {selectedReceipt.buyerName}</p>
-                                        <p className="text-sm">Seller: {selectedReceipt.sellerName}</p>
+                                        {/* <p className="text-sm">Seller: {selectedReceipt.sellerName}</p> */}
                                     </div>
                                     <div>
                                         <h3 className="font-medium">Payment Method</h3>
@@ -220,19 +217,27 @@ export default function ReceiptHistoryPage() {
                                 </div>
                                 <div className="border-t pt-4">
                                     <h3 className="font-medium mb-2">Product Details</h3>
-                                    <div className="flex items-center gap-4">
-                                        {selectedReceipt.productImage && (
-                                            <img
-                                                src={selectedReceipt.productImage}
-                                                alt={selectedReceipt.productTitle || selectedReceipt.name}
-                                                className="h-20 w-20 object-cover rounded"
-                                            />
+                                    <div className="space-y-4">
+                                        {selectedReceipt.products && selectedReceipt.products.length > 0 ? (
+                                            selectedReceipt.products.map((product, idx) => (
+                                                <div key={idx} className="flex items-center gap-4">
+                                                    <img
+                                                        src={product.productImage}
+                                                        alt={product.productTitle}
+                                                        className="h-20 w-20 object-cover rounded"
+                                                    />
+                                                    <div>
+                                                        <p className="font-medium">{product.productTitle}</p>
+                                                        <p className="text-sm text-muted-foreground">Seller: {product.sellerName}</p>
+                                                        <p className="text-sm">Quantity: {product.quantity}</p>
+                                                        <p className="text-sm">Price: ${product.price.toFixed(2)}</p>
+                                                        <p className="text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div>No products found.</div>
                                         )}
-                                        <div>
-                                            <p className="font-medium">{selectedReceipt.productTitle || selectedReceipt.name}</p>
-                                            <p className="text-sm">Quantity: {selectedReceipt.quantity}</p>
-                                            <p className="text-sm">Price: ${selectedReceipt.price?.toFixed(2) ?? selectedReceipt.productPrice?.toFixed(2)}</p>
-                                        </div>
                                     </div>
                                 </div>
                                 <div className="border-t pt-4">

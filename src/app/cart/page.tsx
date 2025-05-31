@@ -189,100 +189,101 @@ function CartContent() {
     setProcessing(true)
 
     try {
-      // Group cart items by sellerId
-      const itemsBySeller = cartItems.reduce((acc, item) => {
-        if (!acc[item.sellerId]) acc[item.sellerId] = [];
-        acc[item.sellerId].push(item);
-        return acc;
-      }, {} as Record<string, CartItem[]>);
-
-      // Process each cart item (for orders, receipts, and buyer notifications)
-      for (const item of cartItems) {
-        try {
-          // Get seller information
-          const sellerDocRef = await getDoc(doc(db, "users", item.sellerId))
-          if (!sellerDocRef.exists()) {
-            throw new Error(`Seller not found for ID: ${item.sellerId}`)
-          }
-          const sellerInfo = sellerDocRef.data()
-
-          // Create order
-          const orderData = {
-            buyerId: user.uid,
-            buyerName: user.displayName || "Anonymous",
-            sellerId: item.sellerId,
-            productId: item.productId,
-            productTitle: item.title,
-            productImage: item.image,
-            quantity: item.quantity,
-            price: item.price,
-            total: (item.price * item.quantity) + 5.99 + ((item.price * item.quantity) * 0.08),
-            status: "confirmed",
-            createdAt: new Date().toISOString(),
-            paymentMethod: selectedPaymentMethod,
-          }
-          const orderRef = await addDoc(collection(db, "orders"), orderData)
-
-          // Create receipt
-          const receiptData = {
-            orderId: orderRef.id,
-            buyerId: user.uid,
-            buyerName: user.displayName || "Anonymous",
-            sellerId: item.sellerId,
-            sellerName: sellerInfo.displayName || "Anonymous",
+      // Map all products for the receipt (no grouping by seller)
+      const products = await Promise.all(
+        cartItems.map(async (item) => {
+          const sellerDoc = await getDoc(doc(db, "users", item.sellerId))
+          return {
             productId: item.productId,
             productTitle: item.title,
             productImage: item.image,
             quantity: item.quantity,
             price: item.price,
             subtotal: item.price * item.quantity,
-            shipping: 5.99,
-            tax: (item.price * item.quantity) * 0.08,
-            total: (item.price * item.quantity) + 5.99 + ((item.price * item.quantity) * 0.08),
-            paymentMethod: selectedPaymentMethod,
-            status: "completed" as "completed" | "pending" | "cancelled"
+            sellerId: item.sellerId,
+            sellerName: sellerDoc.exists() ? sellerDoc.data().displayName : "Unknown Seller"
           }
-          await createReceipt(receiptData)
+        })
+      )
 
-          // Notify buyer (per product)
-          await createNotification({
-            userId: user.uid,
-            type: "order_status",
-            title: "Order Confirmed",
-            message: `Your order for ${item.title} has been confirmed. Click to view receipt.`,
-            read: false,
-            orderId: orderRef.id,
-            productId: item.productId,
-            link: `/orders/${orderRef.id}`
-          })
+      const subtotal = products.reduce((sum, p) => sum + p.subtotal, 0)
+      const shipping = 5.99
+      const tax = subtotal * 0.08
+      const total = subtotal + shipping + tax
 
-          // Remove item from cart
-          await deleteDoc(doc(db, "carts", item.id))
-        } catch (itemError) {
-          toast({
-            title: "Error",
-            description: `Failed to process item: ${item.title}. Please try again.`,
-            variant: "destructive",
-          })
-          throw itemError
+      // Create one order
+      const sellerIds = [...new Set(products.map(p => p.sellerId))];
+      const orderRef = await addDoc(collection(db, "orders"), {
+        buyerId: user.uid,
+        buyerName: user.displayName || "Anonymous",
+        sellerIds,
+        items: products.map(product => ({
+          ...product,
+          sellerId: product.sellerId,
+          sellerName: product.sellerName
+        })),
+        status: "confirmed",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        paymentMethod: selectedPaymentMethod,
+        total: total
+      })
+
+      // Create one receipt for the whole cart
+      await createReceipt({
+        orderId: orderRef.id,
+        buyerId: user.uid,
+        buyerName: user.displayName || "Anonymous",
+        sellerId: "multiple",
+        sellerName: "Multiple Sellers",
+        products,
+        shipping,
+        tax,
+        total,
+        paymentMethod: selectedPaymentMethod,
+        status: "completed"
+      })
+
+      // Notify buyer
+      await createNotification({
+        userId: user.uid,
+        type: "order_status",
+        title: "Order Confirmed",
+        message: `Your order for ${products.map(p => p.productTitle).join(', ')} has been confirmed. Click to view receipt.`,
+        read: false,
+        orderId: orderRef.id,
+        link: `/orders/${orderRef.id}`
+      })
+
+      // Notify each seller about their products
+      const sellerProducts = products.reduce((acc, product) => {
+        if (!acc[product.sellerId]) {
+          acc[product.sellerId] = {
+            sellerName: product.sellerName,
+            products: []
+          }
         }
+        acc[product.sellerId].products.push(product)
+        return acc
+      }, {} as Record<string, { sellerName: string; products: typeof products }>)
+
+      // Send notifications to each seller
+      for (const [sellerId, sellerData] of Object.entries(sellerProducts)) {
+        const sellerTotal = sellerData.products.reduce((sum: number, p) => sum + p.subtotal, 0)
+        await createNotification({
+          userId: sellerId,
+          type: "new_order",
+          title: "New Order Received",
+          message: `You have received a new order for ${sellerData.products.map(p => p.productTitle).join(', ')}`,
+          read: false,
+          orderId: orderRef.id,
+          link: `/dashboard/orders/${orderRef.id}`
+        })
       }
 
-      // Notify each seller once with all their products
-      for (const [sellerId, items] of Object.entries(itemsBySeller)) {
-        const productTitles = items.map(i => i.title).join(', ');
-        // Find the first orderId for this seller from the processed items
-        const firstOrderId = items[0]?.orderId || undefined;
-        const notificationData = {
-          userId: sellerId,
-          type: "order_status" as "order_status",
-          orderId: firstOrderId || "testOrderId",
-          title: "New Order Received",
-          message: `You have received a new order for: ${productTitles}`,
-          read: false
-        };
-        console.log("Notification data being sent:", notificationData);
-        await createNotification(notificationData);
+      // Remove items from cart
+      for (const item of cartItems) {
+        await deleteDoc(doc(db, "carts", item.id))
       }
 
       toast({

@@ -38,6 +38,7 @@ const RecentSales = dynamic(() => import("@/components/dashboard/recent-sales"),
 function DashboardContent() {
   const { user, userRole } = useAuth()
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
   const [selectedTab, setSelectedTab] = useState("overview")
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(),
@@ -73,18 +74,18 @@ function DashboardContent() {
         // Get the start of the current month
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        
+
         // First try without the date filter to check if we have any confirmed orders
         const salesQuery = query(
           collection(db, "orders"),
           where("sellerId", "==", user.uid),
           where("status", "in", ["confirmed", "Confirmed", "CONFIRMED", "paid", "Paid", "PAID", "delivered", "Delivered", "DELIVERED"])
         )
-        
+
         try {
           const snapshot = await getDocs(salesQuery)
           console.log("Total confirmed orders found:", snapshot.size)
-          
+
           // Now try with the date filter
           const monthlyQuery = query(
             collection(db, "orders"),
@@ -92,11 +93,11 @@ function DashboardContent() {
             where("status", "in", ["confirmed", "Confirmed", "CONFIRMED", "paid", "Paid", "PAID", "delivered", "Delivered", "DELIVERED"]),
             where("createdAt", ">=", Timestamp.fromDate(startOfMonth))
           )
-          
+
           const monthlySnapshot = await getDocs(monthlyQuery)
           console.log("Monthly orders found:", monthlySnapshot.size)
           setMonthlySalesCount(monthlySnapshot.size)
-          
+
         } catch (queryError: any) {
           if (queryError?.message?.includes("requires an index")) {
             console.error("Index required for orders query:", queryError)
@@ -141,12 +142,12 @@ function DashboardContent() {
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="notifications" className="relative">
               Notifications
-              {pendingOrdersCount > 0 && selectedTab !== "notifications" && (
-                <Badge 
-                  variant="destructive" 
+              {(pendingOrdersCount > 0 || unreadNotificationsCount > 0) && selectedTab !== "notifications" && (
+                <Badge
+                  variant="destructive"
                   className="ml-2 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
                 >
-                  {pendingOrdersCount}
+                  {unreadNotificationsCount + pendingOrdersCount}
                 </Badge>
               )}
             </TabsTrigger>
@@ -214,7 +215,7 @@ function DashboardContent() {
                   <CardHeader>
                     <CardTitle>Recent Sales</CardTitle>
                     <CardDescription>
-                      {monthlySalesCount !== null 
+                      {monthlySalesCount !== null
                         ? `You made ${monthlySalesCount} sales this month.`
                         : 'Loading sales data...'}
                     </CardDescription>
@@ -233,7 +234,7 @@ function DashboardContent() {
             </div>
           </TabsContent>
           <TabsContent value="notifications">
-            <NotificationsTab />
+            <NotificationsTab onUnreadCountChange={setUnreadNotificationsCount} />
           </TabsContent>
         </Tabs>
       </DashboardShell.Content>

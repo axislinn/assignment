@@ -17,7 +17,7 @@ import {
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/auth-context"
-import { getUserNotifications, type Notification, deleteNotification } from "@/lib/firebase/notifications"
+import { getUserNotifications, type Notification, deleteNotification, markNotificationAsRead, markAllNotificationsAsRead } from "@/lib/firebase/notifications"
 import { createReceipt } from "@/lib/firebase/collections"
 import { createNotification } from "@/lib/firebase/notifications"
 import { ReceiptVoucher } from "@/components/receipt-voucher"
@@ -26,8 +26,9 @@ import { generateReceiptPDF } from "@/lib/utils/pdf-generator"
 import type { ReceiptHistory } from "@/lib/firebase/collections"
 import { useRef } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Bell, Check, MessageSquare, Package, ShoppingBag, Tag } from "lucide-react"
 
-export function NotificationsTab() {
+export function NotificationsTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: number) => void }) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -46,6 +47,9 @@ export function NotificationsTab() {
       try {
         const userNotifications = await getUserNotifications(user.uid)
         setNotifications(userNotifications)
+        // Calculate and notify parent about unread count
+        const unreadCount = userNotifications.filter(n => !n.read).length
+        onUnreadCountChange?.(unreadCount)
       } catch (error) {
         console.error("Error fetching notifications:", error)
         toast({
@@ -59,7 +63,30 @@ export function NotificationsTab() {
     }
 
     fetchNotifications()
-  }, [user, toast])
+  }, [user, toast, onUnreadCountChange])
+
+  const handleMarkAllAsRead = async () => {
+    if (!user) return
+
+    try {
+      await markAllNotificationsAsRead(user.uid)
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notification) => ({ ...notification, read: true }))
+      )
+      onUnreadCountChange?.(0)
+      toast({
+        title: "Success",
+        description: "All notifications marked as read",
+      })
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error)
+      toast({
+        title: "Error",
+        description: "Failed to mark all notifications as read",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleAccept = async (notification: Notification) => {
     /* Commented out accept functionality
@@ -196,9 +223,63 @@ export function NotificationsTab() {
         }
       } catch (err) {
         setError("Failed to fetch receipt information");
+        toast({
+          title: "Error",
+          description: "Failed to fetch receipt information",
+          variant: "destructive",
+        });
       }
     }
   };
+
+  const getNotificationIcon = (type: Notification["type"]) => {
+    switch (type) {
+      case "new_order":
+        return <ShoppingBag className="h-5 w-5 text-blue-600" />
+      case "order_status":
+        return <Package className="h-5 w-5 text-green-600" />
+      case "message":
+        return <MessageSquare className="h-5 w-5 text-purple-600" />
+      case "product_sold":
+        return <Tag className="h-5 w-5 text-yellow-600" />
+      default:
+        return <Bell className="h-5 w-5 text-gray-600" />
+    }
+  }
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await markNotificationAsRead(notificationId)
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notification) =>
+          notification.id === notificationId ? { ...notification, read: true } : notification
+        )
+      )
+    } catch (error) {
+      console.error("Error marking notification as read:", error)
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      await deleteNotification(notificationId)
+      setNotifications((prevNotifications) =>
+        prevNotifications.filter((notification) => notification.id !== notificationId)
+      )
+    } catch (error) {
+      console.error("Error deleting notification:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete notification",
+        variant: "destructive",
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -220,6 +301,18 @@ export function NotificationsTab() {
 
   return (
     <div className="space-y-4">
+      {notifications.some((notification) => !notification.read) && (
+        <div className="flex justify-end px-5">
+          <Button
+            variant="outline"
+            onClick={handleMarkAllAsRead}
+            className="flex items-center gap-2"
+          >
+            <Check className="h-4 w-4" />
+            Mark All as Read
+          </Button>
+        </div>
+      )}
       {notifications.map((notification) => {
         const isBuyer = user?.uid === notification.userId;
         const isOrderNotification = notification.type === "order_status" && notification.orderId;
@@ -228,7 +321,7 @@ export function NotificationsTab() {
           notification.title === "Order Rejected";
         const cardClass = [
           notification.read ? "bg-card" : "bg-muted/20",
-          isOrderNotification ? "transition-transform duration-150" : "",
+          isOrderNotification ? "transition-transform duration-150 cursor-pointer hover:bg-muted/50" : "",
           clickedNotificationId === notification.id ? "scale-95" : "",
           actionedNotificationId === notification.id ? "opacity-50 scale-95 transition-all duration-200" : "",
           isRejectedOrder && isBuyer ? "border-2 border-red-500 bg-transparent" : ""
@@ -238,20 +331,47 @@ export function NotificationsTab() {
             key={notification.id}
             className={cardClass}
             onClick={isOrderNotification ? () => handleNotificationClick(notification) : undefined}
-            style={isOrderNotification ? { cursor: "pointer", border: "2px solid #22c55e" } : {}}
+            style={isOrderNotification && !notification.read ? { border: "2px solid #22c55e" } : {}}
           >
-            <CardHeader>
-              <CardTitle className={isRejectedOrder && isBuyer ? "text-red-700 font-bold" : "text-lg"}>{notification.title}</CardTitle>
-              <CardDescription className={isRejectedOrder && isBuyer ? "text-white" : ""}>
-                {notification.createdAt.toLocaleDateString()} at {notification.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2">
-                <p className={isRejectedOrder && isBuyer ? "text-red-700" : "text-sm text-muted-foreground"}>{notification.message}</p>
-                {isOrderNotification && (
-                  <span className="text-green-600 font-semibold">Click to view receipt</span>
-                )}
+            <CardContent className="p-4">
+              <div className="flex gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                  {getNotificationIcon(notification.type)}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <h3 className="font-medium">{notification.title}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {notification.createdAt.toLocaleDateString()} at{" "}
+                      {notification.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!notification.read && (
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMarkAsRead(notification.id)
+                        }}
+                      >
+                        Mark as Read
+                      </Button>
+                    )}
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-sm text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteNotification(notification.id)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -259,11 +379,11 @@ export function NotificationsTab() {
       })}
       {showReceiptModal && selectedReceipt && (
         <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
-          <DialogContent className="max-w-[210mm] w-[210mm] p-8">
-            <DialogHeader>
+          <DialogContent className="max-w-[210mm] w-[210mm] p-8 max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-none">
               <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6">
+            <div className="space-y-6 flex-1 overflow-y-auto">
               {/* Header */}
               <div className="text-center">
                 <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
@@ -287,41 +407,49 @@ export function NotificationsTab() {
               {/* Product Details */}
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-2">Product Details</h3>
-                <div className="flex items-center gap-4">
-                  <img
-                    src={selectedReceipt.productImage}
-                    alt={selectedReceipt.productTitle}
-                    className="h-20 w-20 object-cover rounded"
-                  />
-                  <div>
-                    <p className="font-medium">{selectedReceipt.productTitle}</p>
-                    <p className="text-sm">Quantity: {selectedReceipt.quantity}</p>
-                    <p className="text-sm">Price: ${selectedReceipt.price.toFixed(2)}</p>
-                  </div>
+                <div className="space-y-4">
+                  {selectedReceipt.products.map((product, idx) => (
+                    <div key={idx} className="flex items-center gap-4">
+                      <img
+                        src={product.productImage}
+                        alt={product.productTitle}
+                        className="h-20 w-20 object-cover rounded"
+                      />
+                      <div>
+                        <p className="font-medium">{product.productTitle}</p>
+                        <p className="text-sm text-muted-foreground">Seller: {product.sellerName}</p>
+                        <p className="text-sm">Quantity: {product.quantity}</p>
+                        <p className="text-sm">Price: ${product.price.toFixed(2)}</p>
+                        <p className="text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Price Breakdown */}
-              <h3 className="font-medium mb-2">Price Breakdown</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>${selectedReceipt.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>${selectedReceipt.shipping.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax</span>
-                  <span>${selectedReceipt.tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold border-t pt-2">
-                  <span>Total</span>
-                  <span>${selectedReceipt.total.toFixed(2)}</span>
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-2">Price Breakdown</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>${selectedReceipt.products.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>${selectedReceipt.shipping.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax</span>
+                    <span>${selectedReceipt.tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold border-t pt-2">
+                    <span>Total</span>
+                    <span>${selectedReceipt.total.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <DialogFooter className="flex justify-center mt-6">
+            <DialogFooter className="flex-none pt-4 mt-6 border-t">
               <Button
                 onClick={() => {
                   generateReceiptPDF(selectedReceipt);

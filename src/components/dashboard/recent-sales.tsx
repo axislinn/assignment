@@ -47,7 +47,7 @@ function RecentSales() {
         const ordersData = confirmedSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        })) as Order[];
 
         setRecentOrders(ordersData);
       } catch (error) {

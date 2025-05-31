@@ -60,7 +60,7 @@ export function DashboardNav({ className, ...props }: DashboardNavProps) {
     },
     {
       title: "Wishlist",
-      href: "/dashboard/wishlist",
+      href: "/wishlist",
       icon: Heart,
       roles: ["buyer"],
     },

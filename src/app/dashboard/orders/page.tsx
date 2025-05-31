@@ -38,71 +38,123 @@ import { MoreHorizontal, Search, Truck } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Define the Order type
-interface Order {
-  id: string;
+interface OrderItem {
+  productId: string;
   productTitle: string;
   productPrice: number;
+  quantity: number;
+  sellerId: string;
+  sellerName: string;
+  subtotal?: number;
+  price?: number;
+}
+
+interface Order {
+  id: string;
+  orderId: string;
+  items: OrderItem[];
   status: string;
   createdAt: {
     seconds: number;
     nanoseconds: number;
   };
   buyerId: string;
-  sellerId: string;
-  price?: number;
+  buyerName: string;
+  total: number;
 }
 
 export default function DashboardOrdersPage() {
   const { user, userRole } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  
+
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [newStatus, setNewStatus] = useState<string>("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  
+
   useEffect(() => {
     if (!user) {
       router.push("/login")
       return
     }
-    
+
     const fetchOrders = async () => {
       try {
         let ordersQuery
-        
+
         if (userRole === "admin") {
-          // Admins can see all orders
+          // Admins can see all confirmed orders
           ordersQuery = query(
             collection(db, "orders"),
+            where("status", "==", "confirmed"),
             orderBy("createdAt", "desc")
           )
         } else if (userRole === "seller") {
-          // Sellers can only see orders for their products
+          // Sellers can only see confirmed orders containing their products
           ordersQuery = query(
             collection(db, "orders"),
-            where("sellerId", "==", user.uid),
+            where("status", "==", "confirmed"),
+            where("sellerIds", "array-contains", user.uid),
             orderBy("createdAt", "desc")
           )
         } else {
-          // Buyers can only see their own orders
+          // Buyers can only see their confirmed orders
           ordersQuery = query(
             collection(db, "orders"),
             where("buyerId", "==", user.uid),
             orderBy("createdAt", "desc")
           )
         }
-        
+
         const ordersSnapshot = await getDocs(ordersQuery)
-        const ordersData = ordersSnapshot.docs.map((doc) => ({
+        let ordersData = ordersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Order[]
-        
-        setOrders(ordersData)
+
+        console.log("Fetched ordersData:", ordersData);
+
+        // Filter confirmed orders for buyers and admins
+        if (userRole !== "seller") {
+          ordersData = ordersData.filter(order => order.status === "confirmed")
+        }
+
+        // For sellers, filter items to only show their products
+        if (userRole === "seller") {
+          const filteredOrders = ordersData
+            .map(order => {
+              // Ensure items is an array and has the required properties
+              const items = Array.isArray(order.items) ? order.items : [];
+              const sellerItems = items.filter(item =>
+                item &&
+                typeof item === 'object' &&
+                item.sellerId === user.uid
+              );
+
+              if (sellerItems.length === 0) return null;
+
+              // Calculate total for seller's items only
+              const total = sellerItems.reduce((sum, item) => {
+                const itemTotal = item.subtotal || (item.productPrice || 0) * (item.quantity || 1);
+                return sum + itemTotal;
+              }, 0);
+
+              return {
+                ...order,
+                items: sellerItems,
+                total
+              };
+            })
+            .filter((order): order is Order => order !== null);
+
+          console.log("Filtered orders for seller:", filteredOrders);
+          setOrders(filteredOrders)
+        } else {
+          setOrders(ordersData)
+        }
       } catch (error) {
         console.error("Error fetching orders:", error)
         toast({
@@ -114,16 +166,18 @@ export default function DashboardOrdersPage() {
         setLoading(false)
       }
     }
-    
+
     fetchOrders()
-  }, [user, userRole, router, toast])
-  
+  }, [user, userRole, router])
+
   const handleStatusChange = async (orderId: string, status: string) => {
+    if (!selectedOrder) return;
+
     try {
       await updateDoc(doc(db, "orders", orderId), {
         status,
       })
-      
+
       // Update local state
       setOrders(
         orders.map((order) =>
@@ -132,12 +186,12 @@ export default function DashboardOrdersPage() {
             : order
         )
       )
-      
+
       toast({
         title: "Status updated",
         description: `Order status has been updated to ${status}`,
       })
-      
+
       setSelectedOrder(null)
       setIsDialogOpen(false)
     } catch (error) {
@@ -149,23 +203,26 @@ export default function DashboardOrdersPage() {
       })
     }
   }
-  
+
   const openStatusDialog = (order: Order) => {
     setSelectedOrder(order)
     setNewStatus(order.status)
     setIsDialogOpen(true)
   }
-  
+
   // Add a function to handle status changes
   const handleStatusSelect = (status: string) => {
     setNewStatus(status)
   }
-  
+
   const filteredOrders = orders.filter((order) =>
-    order.productTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    order.orderId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (Array.isArray(order.items) && order.items.some(item =>
+      item.productTitle?.toLowerCase().includes(searchQuery.toLowerCase())
+    )) ||
     order.status?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-  
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "paid":
@@ -180,13 +237,13 @@ export default function DashboardOrdersPage() {
         return "outline"
     }
   }
-  
+
   return (
     <DashboardShell>
       <DashboardShell.Header>
-        <DashboardShell.Title>Orders</DashboardShell.Title>
+        <DashboardShell.Title>Confirmed Orders</DashboardShell.Title>
         <DashboardShell.Description>
-          {userRole === "buyer" ? "View your orders" : "Manage customer orders"}
+          {userRole === "buyer" ? "View your confirmed orders" : "Manage confirmed customer orders"}
         </DashboardShell.Description>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -224,8 +281,8 @@ export default function DashboardOrdersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order ID</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Price</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   {(userRole === "admin" || userRole === "seller") && (
@@ -237,10 +294,35 @@ export default function DashboardOrdersPage() {
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">
-                      {order.id.substring(0, 8)}...
+                      {order.orderId || order.id}
                     </TableCell>
-                    <TableCell>{order.productTitle}</TableCell>
-                    <TableCell>${(order.productPrice || order.price)?.toFixed(2) || "N/A"}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {Array.isArray(order.items) && order.items.length > 0 ? (
+                          order.items.map((item, index) => (
+                            <div key={index} className="text-sm">
+                              {item.quantity}x {item.productTitle}
+                              {userRole === "seller" && ` (${item.sellerName})`}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground">No items</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {typeof order.total === 'number'
+                        ? `$${order.total.toFixed(2)}`
+                        : Array.isArray(order.items)
+                          ? (() => {
+                            const subtotal = order.items.reduce((sum, item) => sum + (item.subtotal ?? (item.productPrice ?? item.price ?? 0) * (item.quantity || 1)), 0);
+                            const tax = subtotal * 0.08;
+                            const shipping = 5.99;
+                            const total = subtotal + tax + shipping;
+                            return `$${total.toFixed(2)}`;
+                          })()
+                          : "N/A"}
+                    </TableCell>
                     <TableCell>
                       {order.createdAt
                         ? new Date(order.createdAt.seconds * 1000).toLocaleDateString()
@@ -280,39 +362,39 @@ export default function DashboardOrdersPage() {
           </div>
         )}
       </DashboardShell.Content>
-      
-      {/* Status Update Dialog - Moved outside the loop */}
+
+      {/* Status Update Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Update Order Status</DialogTitle>
-      <DialogDescription>
-        Change the status for order {selectedOrder?.id?.substring(0, 8)}...
-      </DialogDescription>
-    </DialogHeader>
-    <div className="py-4">
-      <Select value={newStatus} onValueChange={handleStatusSelect}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select a status" /> {/* Placeholder is used here */}
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="paid">Paid</SelectItem>
-          <SelectItem value="shipped">Shipped</SelectItem>
-          <SelectItem value="delivered">Delivered</SelectItem>
-          <SelectItem value="cancelled">Cancelled</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <DialogFooter>
-      <Button
-        onClick={() => handleStatusChange(selectedOrder?.id || "", newStatus)}
-        disabled={!selectedOrder || selectedOrder.status === newStatus}
-      >
-        Save Changes
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Order Status</DialogTitle>
+            <DialogDescription>
+              Change the status for order {selectedOrder?.orderId}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={newStatus} onValueChange={handleStatusSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="shipped">Shipped</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => handleStatusChange(selectedOrder?.id || "", newStatus)}
+              disabled={!selectedOrder || selectedOrder.status === newStatus}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   )
 }

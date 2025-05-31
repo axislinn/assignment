@@ -102,10 +102,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
                   resource.data.userId == request.auth.uid;
       
-      // UPDATED: allow buyers to create order_status notifications for sellers
+      // UPDATED: allow creating notifications for order status and new orders
       allow create: if isAuthenticated() && (
         request.resource.data.userId == request.auth.uid ||
-        (request.resource.data.type == "order_status" && request.resource.data.orderId != null)
+        (request.resource.data.type == "order_status" && request.resource.data.orderId != null) ||
+        (request.resource.data.type == "new_order" && request.resource.data.orderId != null)
       );
       
       allow update: if isAuthenticated() && 

@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
-import { Menu, User } from 'lucide-react'
+import { Menu, User, LogOut } from 'lucide-react'
 
 export function DashboardHeader() {
   const pathname = usePathname()
@@ -30,18 +30,12 @@ export function DashboardHeader() {
               </div>
             </SheetContent>
           </Sheet>
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-lg font-bold">SecondChance</span>
-          </Link>
-          <div className="hidden md:flex">
-            <span className="text-sm font-medium">Dashboard</span>
-          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" asChild>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" asChild className="flex items-center gap-2">
             <Link href="/">
-              <span className="sr-only">Home</span>
-              <span className="text-sm">Exit Dashboard</span>
+              <LogOut className="h-4 w-4" />
+              <span>Exit Dashboard</span>
             </Link>
           </Button>
           <Avatar className="h-8 w-8">
