@@ -191,11 +191,11 @@ export default function ReceiptHistoryPage() {
             </Card>
             {showModal && selectedReceipt && (
                 <Dialog open={showModal} onOpenChange={handleCloseModal}>
-                    <DialogContent className="max-w-[210mm] w-[210mm] p-8">
+                    <DialogContent className="max-w-[210mm] w-[210mm] p-8 max-h-[90vh] flex flex-col">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-6">
+                        <div className="space-y-6 flex-1 overflow-y-auto">
                             <div className="text-center">
                                 <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
                                 <p className="text-sm text-muted-foreground">Order Receipt</p>
@@ -245,7 +245,7 @@ export default function ReceiptHistoryPage() {
                                     <div className="space-y-2">
                                         <div className="flex justify-between">
                                             <span>Subtotal</span>
-                                            <span>${selectedReceipt.subtotal?.toFixed(2)}</span>
+                                            <span>${selectedReceipt.products?.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2)}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Shipping</span>

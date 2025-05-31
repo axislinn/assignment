@@ -286,6 +286,15 @@ export default function ProductDetailPage() {
       return
     }
 
+    if (userRole === "seller") {
+      toast({
+        title: "Access Denied",
+        description: "Sellers cannot add products to cart. Please use a buyer account.",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       // Check if item already exists in cart
       const cartsQuery = query(

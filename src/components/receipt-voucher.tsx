@@ -34,12 +34,12 @@ export function ReceiptVoucher({
         onCancel()
       }
     }}>
-      <DialogContent className="max-w-[210mm] w-[210mm] p-8">
+      <DialogContent className="max-w-[210mm] w-[210mm] p-8 max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center mb-6">Order Receipt</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 flex-1 overflow-y-auto">
           {/* Header */}
           <div className="text-center">
             <h2 className="text-xl font-semibold">SecondChance Marketplace</h2>
@@ -63,25 +63,23 @@ export function ReceiptVoucher({
           </div>
 
           {/* Product Details */}
-          <div className="border-t pt-4">
-            <h3 className="font-medium mb-2">Product Details</h3>
-            <div className="space-y-4">
-              {orderData.products.map((product, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <img
-                    src={product.productImage}
-                    alt={product.productTitle}
-                    className="h-20 w-20 object-cover rounded"
-                  />
-                  <div>
-                    <p className="font-medium">{product.productTitle}</p>
-                    <p className="text-sm">Quantity: {product.quantity}</p>
-                    <p className="text-sm">Price: ${product.price.toFixed(2)}</p>
-                    <p className="text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
-                  </div>
+          <h3 className="font-medium mb-2">Product Details</h3>
+          <div className="space-y-4">
+            {orderData.products.map((product, index) => (
+              <div key={index} className="flex items-center gap-4">
+                <img
+                  src={product.productImage}
+                  alt={product.productTitle}
+                  className="h-20 w-20 object-cover rounded"
+                />
+                <div>
+                  <p className="font-medium">{product.productTitle}</p>
+                  <p className="text-sm">Quantity: {product.quantity}</p>
+                  <p className="text-sm">Price: ${product.price.toFixed(2)}</p>
+                  <p className="text-sm">Subtotal: ${product.subtotal.toFixed(2)}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           {/* Price Breakdown */}
@@ -108,7 +106,7 @@ export function ReceiptVoucher({
           </div>
         </div>
 
-        <DialogFooter className="flex gap-4 justify-center mt-6">
+        <DialogFooter>
           <Button
             variant="outline"
             onClick={onCancel}

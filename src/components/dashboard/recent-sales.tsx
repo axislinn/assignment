@@ -18,6 +18,10 @@ interface Order {
   sellerId: string
   productTitle: string
   productImage: string
+  items: {
+    productImage: string
+    productTitle: string
+  }[]
 }
 
 function RecentSales() {
@@ -37,7 +41,7 @@ function RecentSales() {
       try {
         const q = query(
           collection(db, "orders"),
-          where("sellerId", "==", user.uid),
+          where("sellerIds", "array-contains", user.uid),
           where("status", "==", "confirmed"),
           orderBy("createdAt", "desc"),
           limit(5)
@@ -51,6 +55,7 @@ function RecentSales() {
 
         setRecentOrders(ordersData);
       } catch (error) {
+        console.error("Failed to fetch recent orders:", error);
         setError("Failed to fetch recent orders");
       } finally {
         setLoading(false);
@@ -90,21 +95,35 @@ function RecentSales() {
       {recentOrders.map((order) => (
         <div key={order.id} className="flex items-center">
           <div className="relative h-12 w-12 rounded-md overflow-hidden">
-            <Image
-              src={order.productImage || "/placeholder.png"}
-              alt={order.productTitle || "Product"}
-              fill
-              className="object-cover"
-              sizes="48px"
-            />
+            {order.items && order.items.length > 0 ? (
+              <Image
+                src={order.items[0].productImage || "/placeholder.png"}
+                alt={order.items[0].productTitle || "Product"}
+                fill
+                className="object-cover"
+                sizes="48px"
+              />
+            ) : (
+              <Image
+                src="/placeholder.png"
+                alt="Product"
+                fill
+                className="object-cover"
+                sizes="48px"
+              />
+            )}
           </div>
           <div className="ml-4 space-y-1">
-            <p className="text-sm font-medium leading-none">{order.productTitle || "Untitled Product"}</p>
+            <p className="text-sm font-medium leading-none">
+              {order.items && order.items.length > 0 ? order.items[0].productTitle : "Untitled Product"}
+            </p>
             <p className="text-sm text-muted-foreground">
               {order.buyerName || "Anonymous Buyer"}
             </p>
           </div>
-          <div className="ml-auto font-medium">+${order.total?.toFixed(2) || "0.00"}</div>
+          <div className="ml-auto font-medium">
+            +${typeof order.total === 'number' ? order.total.toFixed(2) : "0.00"}
+          </div>
         </div>
       ))}
     </div>
