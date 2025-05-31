@@ -21,6 +21,7 @@ interface Order {
   items: {
     productImage: string
     productTitle: string
+    subtotal: number
   }[]
 }
 
@@ -122,7 +123,7 @@ function RecentSales() {
             </p>
           </div>
           <div className="ml-auto font-medium">
-            +${typeof order.total === 'number' ? order.total.toFixed(2) : "0.00"}
+            +${order.items && order.items.length > 0 && typeof order.items[0].subtotal === 'number' ? order.items[0].subtotal.toFixed(2) : "0.00"}
           </div>
         </div>
       ))}

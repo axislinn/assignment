@@ -6,10 +6,16 @@ export function HeroSection() {
     <div className="relative py-12 md:py-16 lg:py-24 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl overflow-hidden mb-8 md:mb-12">
       <div className="container mx-auto px-4">
         <div className="max-w-3xl">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-50 mb-4 md:mb-6">
+          <h1
+            className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 dark:text-gray-50"
+            style={{ color: "hsl(var(--secondary-foreground))" }}
+          >
             Find Treasures, Create Stories
           </h1>
-          <p className="text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-6 md:mb-8">
+          <p
+            className="text-lg md:text-xl mb-6 md:mb-8 dark:text-gray-300"
+            style={{ color: "hsl(var(--secondary-foreground))" }}
+          >
             Buy and sell pre-loved items in your community. Give items a second chance and make sustainable choices
             while saving money.
           </p>
